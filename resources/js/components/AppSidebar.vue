@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { FileText, LayoutGrid, Plus, Users } from '@lucide/vue';
+import { BarChart3, FileText, LayoutGrid, Package, Plus, Sparkles, Users, Wallet } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,8 +15,12 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { create as invoicesCreate, index as invoicesIndex } from '@/routes/invoices';
+import { index as askIndex } from '@/routes/ask';
 import { index as customersIndex } from '@/routes/customers';
+import { index as insightsIndex } from '@/routes/insights';
+import { index as inventoryIndex } from '@/routes/inventory';
+import { create as invoicesCreate, index as invoicesIndex } from '@/routes/invoices';
+import { index as paymentsIndex } from '@/routes/payments';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -24,33 +28,11 @@ const mainNavItems: NavItem[] = [
     { title: 'New Invoice', href: invoicesCreate(), icon: Plus },
     { title: 'Invoices', href: invoicesIndex(), icon: FileText },
     { title: 'Customers', href: customersIndex(), icon: Users },
+    { title: 'Payments', href: paymentsIndex(), icon: Wallet },
+    { title: 'Inventory', href: inventoryIndex(), icon: Package },
+    { title: 'Ask MtaaFlow', href: askIndex(), icon: Sparkles },
+    { title: 'Insights & Reports', href: insightsIndex(), icon: BarChart3 },
 ];
 
 const footerNavItems: NavItem[] = [];
 </script>
-
-<template>
-    <Sidebar collapsible="icon" variant="inset">
-        <SidebarHeader>
-            <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboard()">
-                            <AppLogo />
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
-        </SidebarHeader>
-
-        <SidebarContent>
-            <NavMain :items="mainNavItems" />
-        </SidebarContent>
-
-        <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
-            <NavUser />
-        </SidebarFooter>
-    </Sidebar>
-    <slot />
-</template>
