@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BarChart3, FileText, LayoutGrid, Package, Plus, Sparkles, Users, Wallet } from '@lucide/vue';
+import { BarChart3, FileText, LayoutGrid, Package, Plus, Settings, Sparkles, Users, Wallet } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -32,6 +32,8 @@ const mainNavItems: NavItem[] = [
     { title: 'Inventory', href: inventoryIndex(), icon: Package },
     { title: 'Ask MtaaFlow', href: askIndex(), icon: Sparkles },
     { title: 'Insights & Reports', href: insightsIndex(), icon: BarChart3 },
+    // Plain URL until the backend adds a named route; then swap for a Wayfinder import like the rest
+    { title: 'Business Settings', href: '/business-settings', icon: Settings },
 ];
 
 const footerNavItems: NavItem[] = [];
