@@ -13,6 +13,8 @@ void createInertiaApp({
         switch (true) {
             case name === 'Welcome':
                 return null;
+            case ['auth/login', 'auth/register'].includes(name.toLowerCase()):
+                return null; // these pages draw their own full-screen split layout
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):
