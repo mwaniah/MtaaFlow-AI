@@ -188,7 +188,7 @@ const payTotal = computed(() => d.value.pay.received + d.value.pay.pending + d.v
         <section class="flex flex-col gap-3 rounded-[18px] border border-[#e6e4dc] bg-white p-5">
           <h3 class="font-display text-base font-medium">Best sellers</h3>
           <div v-for="(p, i) in s.bestSellers" :key="p.name" class="flex items-center gap-2.5">
-            <span class="grid size-[26px] place-items-center rounded-full bg-[#e5f4ed] text-sm font-semibold text-[#123d32]">{{ i + 1 }}</span>
+            <span class="grid size-[26px] place-items-center rounded-full bg-[#e5f4ed] text-sm font-semibold text-[#123d32]">{{ Number(i) + 1 }}</span>
             <div class="flex flex-col"><b class="text-sm font-semibold">{{ p.name }}</b><span class="text-xs text-[#6b7773]">{{ p.units }} sold · {{ money(p.revenue) }}</span></div>
           </div>
         </section>
