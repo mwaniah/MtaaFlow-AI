@@ -18,8 +18,8 @@ class InvoiceItem extends Model
     {
         return [
             'quantity' => 'decimal:2',
-            'unit_price' => 'decimal:2',
-            'amount' => 'decimal:2',
+            'unit_price' => 'decimal:4',
+            'amount' => 'decimal:4',
         ];
     }
 

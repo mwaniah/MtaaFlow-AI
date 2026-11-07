@@ -16,13 +16,14 @@ class Invoice extends Model
         'status',
         'issue_date',
         'due_date',
+        'submission_id',
     ];
 
     protected function casts(): array
     {
         return [
-            'subtotal' => 'decimal:2',
-            'total' => 'decimal:2',
+            'subtotal' => 'decimal:4',
+            'total' => 'decimal:4',
             'issue_date' => 'date',
             'due_date' => 'date',
         ];

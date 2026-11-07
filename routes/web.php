@@ -1,14 +1,19 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AIController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentReminderController;
+use App\Http\Controllers\ReportsController;
+use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    Route::inertia('dashboard', 'Dashboard')
+    Route::get('dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
 
     // Customer page handled by CustomerController
@@ -55,6 +60,37 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('invoices/{id}/approve', [InvoiceController::class, 'approve'])
         ->name('invoices.approve');
+
+    Route::get('payments', [PaymentController::class, 'index'])
+        ->name('payments.index');
+
+    Route::get('payments/{payment}', [PaymentController::class, 'show'])
+        ->name('payments.show');
+
+    Route::post('ai/generate-invoice', [AIController::class, 'generateInvoice'])
+        ->middleware('throttle:20,1')
+        ->name('ai.invoice.generate');
+
+    Route::post('ai/ask', [AIController::class, 'ask'])
+        ->middleware('throttle:20,1')
+        ->name('ai.ask');
+
+    Route::get('payment-reminders', [PaymentReminderController::class, 'index'])
+        ->name('payment-reminders.index');
+
+    Route::post('payment-reminders', [PaymentReminderController::class, 'store'])
+        ->name('payment-reminders.store');
+
+    Route::put('payment-reminders/{paymentReminder}', [PaymentReminderController::class, 'update'])
+        ->name('payment-reminders.update');
+
+    Route::patch('payment-reminders/{paymentReminder}', [PaymentReminderController::class, 'update']);
+
+    Route::delete('payment-reminders/{paymentReminder}', [PaymentReminderController::class, 'destroy'])
+        ->name('payment-reminders.destroy');
+
+    Route::get('reports', [ReportsController::class, 'index'])
+        ->name('reports.index');
 });
 
-require __DIR__ . '/settings.php';
+require __DIR__.'/settings.php';

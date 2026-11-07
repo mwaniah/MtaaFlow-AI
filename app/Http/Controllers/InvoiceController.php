@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Currency;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -27,6 +29,7 @@ class InvoiceController extends Controller
     public function create(Request $request)
     {
         return Inertia::render('Invoices/Create', [
+            'currencies' => Currency::all(),
             'customers' => $request->user()
                 ->customers()
                 ->orderBy('name')
@@ -42,9 +45,14 @@ class InvoiceController extends Controller
         );
 
         DB::transaction(function () use ($request, $validated) {
+            $request->user()->newQuery()->whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            if (! empty($validated['submission_id']) && $request->user()->invoices()->where('submission_id', $validated['submission_id'])->exists()) {
+                return;
+            }
             $invoice = $request->user()->invoices()->create([
+                'submission_id' => $validated['submission_id'] ?? null,
                 'customer_id' => $validated['customer_id'],
-                'invoice_number' => 'INV-' . Str::upper(Str::random(16)),
+                'invoice_number' => 'INV-'.Str::upper(Str::random(16)),
                 'currency' => $validated['currency'],
                 'issue_date' => $validated['issue_date'],
                 'due_date' => $validated['due_date'] ?? null,
@@ -85,6 +93,7 @@ class InvoiceController extends Controller
         $this->ensureDraft($invoice);
 
         return Inertia::render('Invoices/Edit', [
+            'currencies' => Currency::all(),
             'invoice' => $invoice,
             'customers' => $request->user()
                 ->customers()
@@ -176,7 +185,7 @@ class InvoiceController extends Controller
 
             $this->ensureDraft($invoice);
 
-            if (!$invoice->items()->exists()) {
+            if (! $invoice->items()->exists()) {
                 throw ValidationException::withMessages([
                     'invoice' => 'An invoice must have at least one item.',
                 ]);
@@ -201,7 +210,8 @@ class InvoiceController extends Controller
                 Rule::exists('customers', 'id')
                     ->where('user_id', $request->user()->id),
             ],
-            'currency' => 'required|in:USD,EUR,GBP',
+            'submission_id' => 'nullable|uuid',
+            'currency' => ['required', Rule::in(array_keys(Currency::all()))],
             'issue_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:issue_date',
             'items' => 'required|array|min:1|max:100',
@@ -211,23 +221,25 @@ class InvoiceController extends Controller
                 'required',
                 'numeric',
                 'min:0',
-                'decimal:0,2',
+                'regex:/^\d+(?:\.\d{1,'.max(1, Currency::precision((string) $request->input('currency'))).'})?$/',
+                function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
+                    $parts = explode('.', (string) $value);
+                    if (strlen($parts[1] ?? '') > Currency::precision((string) $request->input('currency'))) {
+                        $fail('The price has too many decimal places for this currency.');
+                    }
+                },
                 'max:999999.99',
             ],
         ];
     }
 
     // Calculate totals and save invoice items
-    private function saveItems($invoice, array $items): void
+    private function saveItems(Invoice $invoice, array $items): void
     {
         $totalCents = 0;
 
         foreach ($items as $item) {
-            $price = (string) $item['unit_price'];
-            $parts = explode('.', $price, 2);
-
-            $unitCents = ((int) $parts[0] * 100)
-                + (int) str_pad($parts[1] ?? '', 2, '0');
+            $unitCents = Currency::minor((string) $item['unit_price'], $invoice->currency);
 
             $quantity = (int) $item['quantity'];
             $amountCents = $unitCents * $quantity;
@@ -243,25 +255,17 @@ class InvoiceController extends Controller
             $invoice->items()->create([
                 'description' => $item['description'],
                 'quantity' => $quantity,
-                'unit_price' => $this->formatMoney($unitCents),
-                'amount' => $this->formatMoney($amountCents),
+                'unit_price' => Currency::format($unitCents, $invoice->currency),
+                'amount' => Currency::format($amountCents, $invoice->currency),
             ]);
         }
 
-        $total = $this->formatMoney($totalCents);
+        $total = Currency::format($totalCents, $invoice->currency);
 
         $invoice->update([
             'subtotal' => $total,
             'total' => $total,
         ]);
-    }
-
-    // Format integer cents without floating-point calculations
-    private function formatMoney(int $cents): string
-    {
-        return intdiv($cents, 100)
-            . '.'
-            . str_pad((string) ($cents % 100), 2, '0', STR_PAD_LEFT);
     }
 
     // Prevent editing, deleting or reapproving non-draft invoices
