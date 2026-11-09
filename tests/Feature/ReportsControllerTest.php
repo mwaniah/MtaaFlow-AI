@@ -2,6 +2,7 @@
 
 use App\Models\Payment;
 use App\Models\User;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('reports summarize verified payments and outstanding invoices by currency for the owner', function () {
     $user = User::factory()->create();
@@ -81,25 +82,78 @@ test('reports summarize verified payments and outstanding invoices by currency f
         'paid_at' => '2026-11-05 13:00:00',
     ]);
 
-    $response = $this->actingAs($user)->getJson(route('reports.index'));
+    $this->withoutVite()
+        ->actingAs($user)
+        ->get(route('reports.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('verifiedEarningsByCurrency.0.currency', 'EUR')
+            ->where('verifiedEarningsByCurrency.0.total', '7.50')
+            ->where('verifiedEarningsByCurrency.1.currency', 'USD')
+            ->where('verifiedEarningsByCurrency.1.total', '15.50')
+            ->where('monthlyPaymentSummaries.0.month', '2026-10')
+            ->where('monthlyPaymentSummaries.0.currencies.0.total', '7.50')
+            ->where('monthlyPaymentSummaries.1.month', '2026-11')
+            ->where('monthlyPaymentSummaries.1.currencies.0.total', '15.50')
+            ->where('paidInvoiceCount', 2)
+            ->where('unpaidInvoiceCount', 1)
+            ->where('outstandingInvoiceTotalsByCurrency.0.currency', 'USD')
+            ->where('outstandingInvoiceTotalsByCurrency.0.total', '35.00')
+            ->where('customerPaymentSummaries.0.customerName', 'Report customer')
+            ->where('customerPaymentSummaries.0.currency', 'EUR')
+            ->where('customerPaymentSummaries.1.currency', 'USD')
+            ->where('customerPaymentSummaries.1.total', '15.50'));
+});
 
-    $response->assertOk()
-        ->assertJsonPath('verifiedEarningsByCurrency.0.currency', 'EUR')
-        ->assertJsonPath('verifiedEarningsByCurrency.0.total', '7.50')
-        ->assertJsonPath('verifiedEarningsByCurrency.1.currency', 'USD')
-        ->assertJsonPath('verifiedEarningsByCurrency.1.total', '15.50')
-        ->assertJsonPath('monthlyPaymentSummaries.0.month', '2026-10')
-        ->assertJsonPath('monthlyPaymentSummaries.0.currencies.0.total', '7.50')
-        ->assertJsonPath('monthlyPaymentSummaries.1.month', '2026-11')
-        ->assertJsonPath('monthlyPaymentSummaries.1.currencies.0.total', '15.50')
-        ->assertJsonPath('paidInvoiceCount', 2)
-        ->assertJsonPath('unpaidInvoiceCount', 1)
-        ->assertJsonPath('outstandingInvoiceTotalsByCurrency.0.currency', 'USD')
-        ->assertJsonPath('outstandingInvoiceTotalsByCurrency.0.total', '35.00')
-        ->assertJsonPath('customerPaymentSummaries.0.customerName', 'Report customer')
-        ->assertJsonPath('customerPaymentSummaries.0.currency', 'EUR')
-        ->assertJsonPath('customerPaymentSummaries.1.currency', 'USD')
-        ->assertJsonPath('customerPaymentSummaries.1.total', '15.50');
+test('reports calculate zero and three decimal currencies and retain partial balances', function () {
+    $user = User::factory()->create();
+    $customer = $user->customers()->create(['name' => 'Precision customer']);
+
+    $jpyInvoice = $user->invoices()->create([
+        'customer_id' => $customer->id,
+        'invoice_number' => 'INV-REPORT-JPY',
+        'currency' => 'JPY',
+        'subtotal' => '1000',
+        'total' => '1000',
+        'status' => 'approved',
+        'issue_date' => '2026-11-01',
+    ]);
+    $kwdInvoice = $user->invoices()->create([
+        'customer_id' => $customer->id,
+        'invoice_number' => 'INV-REPORT-KWD',
+        'currency' => 'KWD',
+        'subtotal' => '10',
+        'total' => '10',
+        'status' => 'approved',
+        'issue_date' => '2026-11-01',
+    ]);
+    Payment::query()->create([
+        'invoice_id' => $jpyInvoice->id,
+        'amount' => '250',
+        'currency' => 'JPY',
+        'status' => 'completed',
+        'paid_at' => '2026-11-05 10:00:00',
+    ]);
+    Payment::query()->create([
+        'invoice_id' => $kwdInvoice->id,
+        'amount' => '1.125',
+        'currency' => 'KWD',
+        'status' => 'completed',
+        'paid_at' => '2026-11-05 11:00:00',
+    ]);
+
+    $this->withoutVite()
+        ->actingAs($user)
+        ->get(route('reports.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('verifiedEarningsByCurrency.0.currency', 'JPY')
+            ->where('verifiedEarningsByCurrency.0.total', '250')
+            ->where('verifiedEarningsByCurrency.1.currency', 'KWD')
+            ->where('verifiedEarningsByCurrency.1.total', '1.125')
+            ->where('unpaidInvoiceCount', 2)
+            ->where('outstandingInvoiceTotalsByCurrency.0.currency', 'JPY')
+            ->where('outstandingInvoiceTotalsByCurrency.0.total', '750')
+            ->where('outstandingInvoiceTotalsByCurrency.1.currency', 'KWD')
+            ->where('outstandingInvoiceTotalsByCurrency.1.total', '8.875'));
 });
 
 test('reports are available only to authenticated freelancers', function () {

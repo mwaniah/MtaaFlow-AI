@@ -3,7 +3,7 @@
 use App\Models\Payment;
 use App\Models\User;
 
-test('a freelancer can create a reminder draft for an approved unpaid invoice', function () {
+test('a freelancer can create a reminder draft for an approved invoice with an outstanding balance', function () {
     $user = User::factory()->create();
     $customer = $user->customers()->create(['name' => 'Reminder customer']);
     $invoice = $user->invoices()->create([
@@ -27,6 +27,38 @@ test('a freelancer can create a reminder draft for an approved unpaid invoice', 
     $this->assertDatabaseHas('payment_reminders', [
         'invoice_id' => $invoice->id,
         'message' => 'A friendly payment reminder.',
+        'status' => 'draft',
+    ]);
+});
+
+test('reminder creation supports invoices with partial completed payments', function () {
+    $user = User::factory()->create();
+    $customer = $user->customers()->create(['name' => 'Partially paid customer']);
+    $invoice = $user->invoices()->create([
+        'customer_id' => $customer->id,
+        'invoice_number' => 'INV-REMINDER-PARTIAL',
+        'currency' => 'USD',
+        'subtotal' => '60.00',
+        'total' => '60.00',
+        'status' => 'approved',
+        'issue_date' => '2026-11-01',
+    ]);
+    $invoice->payments()->create([
+        'amount' => '20.00',
+        'currency' => 'USD',
+        'status' => 'completed',
+    ]);
+
+    $response = $this->actingAs($user)->postJson(route('payment-reminders.store'), [
+        'invoice_id' => $invoice->id,
+        'message' => 'Please pay the remaining balance.',
+    ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('reminder.status', 'draft')
+        ->assertJsonPath('reminder.invoice.id', $invoice->id);
+    $this->assertDatabaseHas('payment_reminders', [
+        'invoice_id' => $invoice->id,
         'status' => 'draft',
     ]);
 });

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Currency;
 use App\Models\Payment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -20,7 +21,9 @@ class ReportsController extends Controller
             ->where('status', 'completed')
             ->whereHas(
                 'invoice',
-                fn (Builder $query) => $query->where('user_id', $user->id)
+                fn (Builder $query) => $query
+                    ->where('user_id', $user->id)
+                    ->whereColumn('invoices.currency', 'payments.currency')
             )
             ->with([
                 'invoice:id,user_id,customer_id',
@@ -35,12 +38,12 @@ class ReportsController extends Controller
                 'created_at',
             ]);
 
-        // Retrieve approved invoices without completed payments
+        // Include only approved invoices with a positive remaining balance.
         $outstandingInvoices = $user->invoices()
             ->where('status', 'approved')
-            ->whereDoesntHave(
-                'payments',
-                fn (Builder $query) => $query->where('status', 'completed')
+            ->whereRaw(
+                'total > COALESCE((SELECT SUM(payments.amount) FROM payments WHERE payments.invoice_id = invoices.id AND payments.status = ? AND payments.currency = invoices.currency), 0)',
+                ['completed']
             );
 
         // Return financial reports to the Vue page using Inertia
@@ -69,11 +72,22 @@ class ReportsController extends Controller
                 ->count(),
 
             'outstandingInvoiceTotalsByCurrency' => $outstandingInvoices
-                ->select('currency')
-                ->selectRaw('SUM(total) as total')
-                ->groupBy('currency')
-                ->orderBy('currency')
-                ->get(),
+                ->select('invoices.currency')
+                ->selectRaw(
+                    'SUM(invoices.total - COALESCE((SELECT SUM(payments.amount) FROM payments WHERE payments.invoice_id = invoices.id AND payments.status = ? AND payments.currency = invoices.currency), 0)) as total',
+                    ['completed']
+                )
+                ->groupBy('invoices.currency')
+                ->orderBy('invoices.currency')
+                ->get()
+                ->map(fn (object $summary): array => [
+                    'currency' => $summary->currency,
+                    'total' => Currency::format(
+                        Currency::minor((string) $summary->total, $summary->currency),
+                        $summary->currency
+                    ),
+                ])
+                ->values(),
 
             'customerPaymentSummaries' => $verifiedPayments
                 ->groupBy(
@@ -116,32 +130,25 @@ class ReportsController extends Controller
     }
 
     /**
-     * Calculate payment totals using integer cents.
+     * Calculate payment totals using the currency's minor unit.
      *
      * @param  Collection<int, Payment>  $payments
      */
     private function sumAmounts(Collection $payments): string
     {
-        $totalCents = 0;
+        $currency = $payments->first()->currency;
+        $totalMinor = 0;
 
         foreach ($payments as $payment) {
-            [$whole, $fraction] = array_pad(
-                explode('.', (string) $payment->amount, 2),
-                2,
-                ''
-            );
+            $amountMinor = Currency::minor((string) $payment->amount, $currency);
 
-            $totalCents += ((int) $whole * 100)
-                + (int) str_pad(substr($fraction, 0, 2), 2, '0');
+            if ($amountMinor > PHP_INT_MAX - $totalMinor) {
+                throw new \OverflowException('The payment total exceeds the supported range.');
+            }
+
+            $totalMinor += $amountMinor;
         }
 
-        return intdiv($totalCents, 100)
-            .'.'
-            .str_pad(
-                (string) ($totalCents % 100),
-                2,
-                '0',
-                STR_PAD_LEFT
-            );
+        return Currency::format($totalMinor, $currency);
     }
 }

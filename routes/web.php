@@ -4,12 +4,21 @@ use App\Http\Controllers\AIController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoiceShareController;
+use App\Http\Controllers\InventoryAdjustmentController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentReminderDeliveryController;
 use App\Http\Controllers\PaymentReminderController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportsController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+
+Route::get('shared/invoices/{token}', [InvoiceShareController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->name('invoice-shares.public');
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
@@ -61,15 +70,42 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('invoices/{id}/approve', [InvoiceController::class, 'approve'])
         ->name('invoices.approve');
 
+    Route::post('invoices/{invoice}/shares', [InvoiceShareController::class, 'store'])
+        ->name('invoices.shares.store');
+
+    Route::delete('invoices/{invoice}/shares/{invoiceShare}', [InvoiceShareController::class, 'destroy'])
+        ->name('invoices.shares.destroy');
+
+    Route::post('invoices/{invoice}/shares/{invoiceShare}/email', [InvoiceShareController::class, 'email'])
+        ->middleware('throttle:10,1')
+        ->name('invoices.shares.email');
+
     Route::get('payments', [PaymentController::class, 'index'])
         ->name('payments.index');
 
     Route::get('payments/{payment}', [PaymentController::class, 'show'])
         ->name('payments.show');
 
+    Route::post('invoices/{invoice}/paypal/orders', [PaymentController::class, 'createPaypalOrder'])
+        ->middleware('throttle:10,1')
+        ->name('payments.paypal.orders');
+
+    Route::post('paypal/orders/{orderId}/capture', [PaymentController::class, 'capturePaypalOrder'])
+        ->middleware('throttle:10,1')
+        ->where('orderId', '[A-Za-z0-9-]+')
+        ->name('payments.paypal.capture');
+
     Route::post('ai/generate-invoice', [AIController::class, 'generateInvoice'])
         ->middleware('throttle:20,1')
         ->name('ai.invoice.generate');
+
+    Route::post('ai/invoice/confirm', [AIController::class, 'confirmInvoice'])
+        ->middleware('throttle:20,1')
+        ->name('ai.invoice.confirm');
+
+    Route::post('ai/actions/confirm', [AIController::class, 'confirmAction'])
+        ->middleware('throttle:20,1')
+        ->name('ai.actions.confirm');
 
     Route::post('ai/ask', [AIController::class, 'ask'])
         ->middleware('throttle:20,1')
@@ -89,8 +125,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('payment-reminders/{paymentReminder}', [PaymentReminderController::class, 'destroy'])
         ->name('payment-reminders.destroy');
 
+    Route::post('payment-reminders/{paymentReminder}/deliveries', [PaymentReminderDeliveryController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('payment-reminders.deliveries.store');
+
     Route::get('reports', [ReportsController::class, 'index'])
         ->name('reports.index');
+
+    Route::apiResource('products', ProductController::class);
+
+    Route::get('products/{product}/adjustments', [InventoryAdjustmentController::class, 'index'])
+        ->name('products.adjustments.index');
+
+    Route::post('products/{product}/adjustments', [InventoryAdjustmentController::class, 'store'])
+        ->name('products.adjustments.store');
 });
 
 require __DIR__.'/settings.php';

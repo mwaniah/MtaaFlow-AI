@@ -54,6 +54,16 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->hasMany(Invoice::class);
     }
 
+    public function pendingActions(): HasMany
+    {
+        return $this->hasMany(PendingAction::class);
+    }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
     // Check whether a user is an administrator
     public function isAdmin(): bool
     {

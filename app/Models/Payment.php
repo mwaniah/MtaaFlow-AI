@@ -10,6 +10,9 @@ class Payment extends Model
         'invoice_id',
         'paypal_order_id',
         'paypal_capture_id',
+        'idempotency_key',
+        'paypal_capture_request_id',
+        'paypal_approval_url',
         'amount',
         'currency',
         'status',
@@ -19,7 +22,7 @@ class Payment extends Model
     protected function casts(): array
     {
         return [
-            'amount' => 'decimal:2',
+            'amount' => 'decimal:4',
             'paid_at' => 'datetime',
         ];
     }

@@ -10,13 +10,16 @@ class PaymentReminder extends Model
         'invoice_id',
         'message',
         'status',
+        'delivery_channel',
         'sent_at',
+        'prepared_at',
     ];
 
     protected function casts(): array
     {
         return [
             'sent_at' => 'datetime',
+            'prepared_at' => 'datetime',
         ];
     }
 

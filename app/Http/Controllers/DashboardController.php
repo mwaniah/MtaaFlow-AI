@@ -15,7 +15,9 @@ class DashboardController extends Controller
         $user = $request->user();
         $verifiedPayments = Payment::query()
             ->where('status', 'completed')
-            ->whereHas('invoice', fn (Builder $query) => $query->where('user_id', $user->id));
+            ->whereHas('invoice', fn (Builder $query) => $query
+                ->where('user_id', $user->id)
+                ->whereColumn('invoices.currency', 'payments.currency'));
 
         $outstandingInvoices = $user->invoices()
             ->where('status', 'approved')

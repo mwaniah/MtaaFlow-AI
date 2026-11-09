@@ -34,10 +34,27 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
+    // gemini API configuration
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+    ],
+
+    'paypal' => [
+        'client_id' => env('PAYPAL_CLIENT_ID'),
+        'client_secret' => env('PAYPAL_CLIENT_SECRET'),
+        'mode' => env('PAYPAL_MODE', 'sandbox'),
+        'base_url' => env(
+            'PAYPAL_BASE_URL',
+            env('PAYPAL_MODE', 'sandbox') === 'live'
+                ? 'https://api-m.paypal.com'
+                : 'https://api-m.sandbox.paypal.com'
+        ),
+        'supported_currencies' => [
+            'AUD', 'BRL', 'CAD', 'CZK', 'DKK', 'EUR', 'HKD', 'HUF', 'ILS', 'JPY',
+            'MYR', 'MXN', 'TWD', 'NZD', 'NOK', 'PHP', 'PLN', 'GBP', 'SGD', 'SEK',
+            'CHF', 'THB', 'USD',
+        ],
     ],
 
 ];

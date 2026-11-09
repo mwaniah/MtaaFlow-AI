@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
@@ -52,5 +53,10 @@ class Invoice extends Model
     public function reminders()
     {
         return $this->hasMany(PaymentReminder::class);
+    }
+
+    public function shares(): HasMany
+    {
+        return $this->hasMany(InvoiceShare::class);
     }
 }
