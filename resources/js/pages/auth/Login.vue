@@ -1,110 +1,52 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
-import InputError from '@/components/InputError.vue';
-import PasswordInput from '@/components/PasswordInput.vue';
-import TextLink from '@/components/TextLink.vue';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
-import { register } from '@/routes';
-import { store } from '@/routes/login';
-import { request } from '@/routes/password';
-import PasskeyVerify from '@/components/PasskeyVerify.vue';
+import { Head, Link, useForm } from '@inertiajs/vue3';
+import AuthSplit from '@/components/AuthSplit.vue';
 
-defineOptions({
-    layout: {
-        title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
-    },
-});
+// These props come from the starter kit's login view; declared so they don't fall through as HTML attributes.
+defineProps<{ status?: string; canResetPassword?: boolean; canRegister?: boolean }>();
 
-defineProps<{
-    status?: string;
-    canResetPassword: boolean;
-}>();
+const form = useForm({ email: '', password: '' });
+
+function submit() {
+    // TODO: switch to the generated route helper once routes are final.
+    form.post('/login', { onFinish: () => form.reset('password') });
+}
+
+const input = 'w-full rounded-lg border-[1.5px] bg-white px-3 py-[11px] text-sm text-[#202a27] outline-none focus:border-[#15966b] focus:ring-2 focus:ring-[#15966b]/20';
 </script>
 
 <template>
     <Head title="Log in" />
-
-    <div
-        v-if="status"
-        class="mb-4 text-center text-sm font-medium text-green-600"
-    >
-        {{ status }}
-    </div>
-
-    <PasskeyVerify />
-
-    <Form
-        v-bind="store.form()"
-        :reset-on-success="['password']"
-        v-slot="{ errors, processing }"
-        class="flex flex-col gap-6"
-    >
-        <div class="grid gap-6">
-            <div class="grid gap-2">
-                <Label for="email">Email address</Label>
-                <Input
-                    id="email"
-                    type="email"
-                    name="email"
-                    required
-                    v-focus
-                    :tabindex="1"
-                    autocomplete="email"
-                    placeholder="email@example.com"
-                />
-                <InputError :message="errors.email" />
+    <AuthSplit>
+        <form class="flex flex-col gap-4" @submit.prevent="submit">
+            <div class="flex flex-col gap-1">
+                <h1 class="font-display text-[28px] leading-[1.15] font-bold tracking-[-0.02em] text-[#202a27]">Welcome back</h1>
+                <p class="text-sm text-[#6b7773]">Log in to manage your business.</p>
             </div>
 
-            <div class="grid gap-2">
-                <div class="flex items-center justify-between">
-                    <Label for="password">Password</Label>
-                    <TextLink
-                        v-if="canResetPassword"
-                        :href="request()"
-                        class="text-sm"
-                        :tabindex="5"
-                    >
-                        Forgot your password?
-                    </TextLink>
-                </div>
-                <PasswordInput
-                    id="password"
-                    name="password"
-                    required
-                    :tabindex="2"
-                    autocomplete="current-password"
-                    placeholder="Password"
-                />
-                <InputError :message="errors.password" />
+            <p v-if="status" class="rounded-lg bg-[#e5f4ed] px-3 py-2 text-sm text-[#0d6b4a]" role="status">{{ status }}</p>
+
+            <div class="flex flex-col gap-1.5">
+                <label for="email" class="text-xs text-[#6b7773]">Email</label>
+                <input id="email" v-model="form.email" type="email" autocomplete="email" autofocus required placeholder="you@example.com"
+                    :class="[input, form.errors.email ? 'border-[#b4432f]' : 'border-[#e6e4dc]']" />
+                <p v-if="form.errors.email" class="text-xs text-[#b4432f]" role="alert">{{ form.errors.email }}</p>
             </div>
 
-            <div class="flex items-center justify-between">
-                <Label for="remember" class="flex items-center space-x-3">
-                    <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span>Remember me</span>
-                </Label>
+            <div class="flex flex-col gap-1.5">
+                <label for="password" class="text-xs text-[#6b7773]">Password</label>
+                <input id="password" v-model="form.password" type="password" autocomplete="current-password" required placeholder="••••••••••"
+                    :class="[input, form.errors.password ? 'border-[#b4432f]' : 'border-[#e6e4dc]']" />
+                <p v-if="form.errors.password" class="text-xs text-[#b4432f]" role="alert">{{ form.errors.password }}</p>
             </div>
 
-            <Button
-                type="submit"
-                class="mt-4 w-full"
-                :tabindex="4"
-                :disabled="processing"
-                data-test="login-button"
-            >
-                <Spinner v-if="processing" />
-                Log in
-            </Button>
-        </div>
+            <button type="submit" :disabled="form.processing" class="w-full rounded-xl bg-[#15966b] px-[18px] py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                {{ form.processing ? 'Logging in…' : 'Log in' }}
+            </button>
 
-        <div class="text-center text-sm text-muted-foreground">
-            Don't have an account?
-            <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
-        </div>
-    </Form>
+            <p v-if="canRegister !== false" class="text-xs text-[#6b7773]">
+                New to MtaaFlow? <Link href="/register" class="font-semibold text-[#0d6b4a] underline-offset-2 hover:underline">Create a business account</Link>
+            </p>
+        </form>
+    </AuthSplit>
 </template>
