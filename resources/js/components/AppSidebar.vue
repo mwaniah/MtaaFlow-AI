@@ -15,10 +15,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { index as askIndex } from '@/routes/ask';
 import { index as customersIndex } from '@/routes/customers';
-import { index as insightsIndex } from '@/routes/insights';
-import { index as inventoryIndex } from '@/routes/inventory';
 import { create as invoicesCreate, index as invoicesIndex } from '@/routes/invoices';
 import { index as paymentsIndex } from '@/routes/payments';
 import type { NavItem } from '@/types';
@@ -29,11 +26,11 @@ const mainNavItems: NavItem[] = [
     { title: 'Invoices', href: invoicesIndex(), icon: FileText },
     { title: 'Customers', href: customersIndex(), icon: Users },
     { title: 'Payments', href: paymentsIndex(), icon: Wallet },
-    { title: 'Inventory', href: inventoryIndex(), icon: Package },
-    { title: 'Ask MtaaFlow', href: askIndex(), icon: Sparkles },
-    { title: 'Insights & Reports', href: insightsIndex(), icon: BarChart3 },
+    { title: 'Inventory', href: '/inventory', icon: Package },
+    { title: 'Ask MtaaFlow', href: '/ask', icon: Sparkles },
+    { title: 'Insights & Reports', href: '/reports', icon: BarChart3 },
     // Plain URL until the backend adds a named route; then swap for a Wayfinder import like the rest
-    { title: 'Business Settings', href: '/business-settings', icon: Settings },
+    { title: 'Business Settings', href: '/settings', icon: Settings },
 ];
 
 const footerNavItems: NavItem[] = [];
