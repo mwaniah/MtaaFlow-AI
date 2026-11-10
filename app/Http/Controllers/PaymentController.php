@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -19,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 
 class PaymentController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): \Inertia\Response
     {
         $payments = Payment::query()
             ->whereHas('invoice', fn (Builder $query) => $query->where('user_id', $request->user()->id))
@@ -27,8 +28,36 @@ class PaymentController extends Controller
             ->latest()
             ->get();
 
-        return response()->json([
-            'payments' => $payments,
+        // Totals per status and currency, summed in whole cents so the numbers are exact.
+        $totals = $payments
+            ->groupBy(fn (Payment $payment): string => $payment->status.'|'.$payment->currency)
+            ->map(function ($group): array {
+                $first = $group->first();
+                $cents = $group->sum(fn (Payment $payment): int => (int) round(((float) $payment->amount) * 100));
+
+                return [
+                    'status' => $first->status,
+                    'currency' => $first->currency,
+                    'total' => number_format($cents / 100, 2, '.', ''),
+                    'count' => $group->count(),
+                ];
+            })
+            ->values();
+
+        return Inertia::render('Payments/Index', [
+            'payments' => $payments->map(fn (Payment $payment): array => [
+                'id' => $payment->id,
+                'invoice_id' => $payment->invoice_id,
+                'paypal_id' => $payment->paypal_capture_id ?? $payment->paypal_order_id,
+                'customer' => $payment->invoice?->customer?->name,
+                'invoice' => $payment->invoice?->invoice_number,
+                'amount' => (string) $payment->amount,
+                'currency' => $payment->currency,
+                'status' => $payment->status,
+                'paid_at' => $payment->paid_at?->toIso8601String(),
+                'created_at' => $payment->created_at?->toIso8601String(),
+            ])->values(),
+            'totals' => $totals,
         ]);
     }
 
