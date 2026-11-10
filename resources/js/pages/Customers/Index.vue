@@ -6,12 +6,10 @@ import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatMoney } from '@/lib/money';
-import { sampleCustomers } from '@/mock/customers';
 import type { Customer } from '@/types/customer';
 
-// Real data from the backend replaces the sample automatically.
 const props = withDefaults(defineProps<{ customers?: Customer[] }>(), {
-    customers: () => sampleCustomers,
+    customers: () => [],
 });
 
 type Filter = 'all' | 'balance' | 'overdue' | 'up_to_date';

@@ -142,3 +142,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/settings.php';
+
+// LOCAL ONLY: delete before merging.
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::inertia('inventory', 'Inventory/Index')->name('inventory.index');
+    Route::inertia('ask', 'AskMtaaFlow/Index')->name('ask.index');
+    Route::inertia('insights', 'Insights/Index')->name('insights.index');
+});

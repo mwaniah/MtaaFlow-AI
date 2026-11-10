@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import StatusBadge from '@/components/StatusBadge.vue';
+import { formatMoney } from '@/lib/money';
 import { dashboard } from '@/routes';
 
 defineOptions({
@@ -16,56 +18,87 @@ defineOptions({
 
 type BadgeStatus = 'paid' | 'pending' | 'partial' | 'overdue' | 'draft' | 'cancelled' | 'up_to_date';
 
-// Placeholder data taken from the Figma frame. Replace with Inertia props from DashboardController.
-const greetingName = 'Wanjiru';
-const summary = 'USD 18,500 is waiting on 4 invoices. One is overdue.';
+interface Stats {
+    total_sales: number;
+    sales_change_pct: number | null;
+    payments_received: number;
+    outstanding: number;
+    outstanding_invoices: number;
+    overdue: number;
+    overdue_invoices: number;
+}
+interface RevenuePoint { month: string; value: number }
+interface Insight { title: string; body: string }
+interface RecentInvoice { id: number; number: string; customer_name: string; total_amount: number; status: BadgeStatus }
+interface Transaction { id: number; label: string; amount: number; failed: boolean }
+interface TopSeller { name: string; sold: number }
+interface LowStockItem { id: number; product: string; left: number }
 
-const kpis = [
-    { label: 'Total sales · October', value: 'USD 142,800', note: '+12% on September', variant: 'featured' },
-    { label: 'Payments received', value: 'USD 124,300', note: 'Verified via PayPal', variant: 'default' },
-    { label: 'Outstanding', value: 'USD 18,500', note: '4 invoices', variant: 'default' },
-    { label: 'Overdue', value: 'USD 7,000', note: '1 invoice', variant: 'danger' },
-];
+// Everything here is sent by DashboardController. With no data it shows empty states.
+const props = withDefaults(
+    defineProps<{
+        stats?: Stats;
+        revenue?: RevenuePoint[];
+        insights?: Insight[];
+        invoices?: RecentInvoice[];
+        transactions?: Transaction[];
+        topSellers?: TopSeller[];
+        lowStock?: LowStockItem[];
+    }>(),
+    {
+        stats: () => ({
+            total_sales: 0,
+            sales_change_pct: null,
+            payments_received: 0,
+            outstanding: 0,
+            outstanding_invoices: 0,
+            overdue: 0,
+            overdue_invoices: 0,
+        }),
+        revenue: () => [],
+        insights: () => [],
+        invoices: () => [],
+        transactions: () => [],
+        topSellers: () => [],
+        lowStock: () => [],
+    },
+);
 
-const revenue = [
-    { month: 'May', value: 75.6 },
-    { month: 'Jun', value: 99 },
-    { month: 'Jul', value: 86.4 },
-    { month: 'Aug', value: 126 },
-    { month: 'Sep', value: 140.4 },
-    { month: 'Oct', value: 165.6 },
-];
-const maxRevenue = Math.max(...revenue.map((r) => r.value));
+// Greeting uses the logged-in user's first name.
+const page = usePage();
+const firstName = computed(() => {
+    const user = (page.props as unknown as { auth?: { user?: { name?: string } } }).auth?.user;
+    return user?.name?.split(' ')[0] ?? '';
+});
 
-const insights = [
-    { title: 'Hoodies drive 41% of sales.', body: 'Only 4 left. At this pace they sell out in 6 days.' },
-    { title: 'Peter Otieno is 4 days late.', body: 'A friendly reminder is drafted and ready.' },
-];
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-const invoices: { no: string; customer: string; amount: string; status: BadgeStatus }[] = [
-    { no: 'INV-0043', customer: 'Brian Kamau', amount: 'USD 6,100', status: 'pending' },
-    { no: 'INV-0041', customer: 'Amina Hassan', amount: 'USD 12,500', status: 'paid' },
-    { no: 'INV-0039', customer: 'Peter Otieno', amount: 'USD 7,000', status: 'overdue' },
-    { no: 'INV-0038', customer: 'Grace Njeri', amount: 'USD 3,200', status: 'draft' },
-];
+const summary = computed(() => {
+    const s = props.stats;
+    if (s.outstanding_invoices === 0) return 'Nothing is waiting on payment right now.';
+    const base = `${formatMoney(s.outstanding)} is waiting on ${plural(s.outstanding_invoices, 'invoice')}.`;
+    if (s.overdue_invoices === 0) return base;
+    return `${base} ${s.overdue_invoices === 1 ? 'One is' : `${s.overdue_invoices} are`} overdue.`;
+});
 
-const transactions = [
-    { label: 'Amina Hassan · PayPal 8XK2…91A', amount: '+USD 12,500', failed: false },
-    { label: 'Joseph Mutua · PayPal 4TP7…20C', amount: '+USD 4,800', failed: false },
-    { label: 'Lucy Achieng · PayPal failed, retry', amount: 'USD 2,300', failed: true },
-];
+const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
 
-const topSellers = [
-    { name: 'Hoodies', sold: 58 },
-    { name: 'Caps', sold: 41 },
-    { name: 'Tote bags', sold: 22 },
-];
-const maxSold = Math.max(...topSellers.map((p) => p.sold));
+const kpis = computed(() => {
+    const s = props.stats;
+    const change =
+        s.sales_change_pct === null
+            ? 'No earlier month to compare'
+            : `${s.sales_change_pct > 0 ? '+' : ''}${s.sales_change_pct}% on last month`;
+    return [
+        { label: `Total sales · ${monthName}`, value: formatMoney(s.total_sales), note: change, variant: 'featured' },
+        { label: 'Payments received', value: formatMoney(s.payments_received), note: 'Verified via PayPal', variant: 'default' },
+        { label: 'Outstanding', value: formatMoney(s.outstanding), note: plural(s.outstanding_invoices, 'invoice'), variant: 'default' },
+        { label: 'Overdue', value: formatMoney(s.overdue), note: plural(s.overdue_invoices, 'invoice'), variant: 'danger' },
+    ];
+});
 
-const lowStock = [
-    { product: 'Hoodie, black M', left: 4, tone: 'danger' },
-    { product: 'Cap, navy', left: 9, tone: 'warn' },
-];
+const maxRevenue = computed(() => Math.max(1, ...props.revenue.map((r) => r.value)));
+const maxSold = computed(() => Math.max(1, ...props.topSellers.map((p) => p.sold)));
 </script>
 
 <template>
@@ -75,7 +108,7 @@ const lowStock = [
         <!-- Greeting -->
         <div class="flex flex-col gap-1">
             <h1 class="font-display text-[28px] leading-[1.15] font-bold tracking-[-0.02em] text-[#202a27]">
-                Habari, {{ greetingName }}
+                Habari{{ firstName ? `, ${firstName}` : '' }}
             </h1>
             <p class="text-sm text-[#6b7773]">{{ summary }}</p>
         </div>
@@ -111,30 +144,22 @@ const lowStock = [
             </div>
         </div>
 
-        <!-- Local currency estimate -->
-        <div class="flex flex-col gap-1 rounded-[10px] bg-[#e8f7f5] px-[18px] py-[11px]">
-            <p class="text-xs text-[#14665c]">Local currency view · Preferred currency: KES ▾</p>
-            <p class="text-[13px] text-[#2e424d]">
-                Payments received: USD 124,300 · Estimated KES value shown using latest available rate
-            </p>
-            <p class="text-[10px] text-[#61757a]">
-                Estimate only · Exchange rates change · Actual PayPal payout may differ
-            </p>
-        </div>
-
         <!-- Revenue + AI insights -->
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
             <section class="flex flex-col gap-2.5 rounded-[18px] border border-[#e6e4dc] bg-white p-5 lg:col-span-3">
                 <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">Revenue</h2>
-                <p class="text-xs text-[#6b7773]">Last 6 months, USD thousands</p>
-                <div class="flex items-end gap-3.5 pt-3" style="height: 208px">
+                <p class="text-xs text-[#6b7773]">Last 6 months</p>
+                <p v-if="revenue.length === 0" class="py-10 text-center text-sm text-[#6b7773]">
+                    No revenue yet. It appears once invoices are paid.
+                </p>
+                <div v-else class="flex items-end gap-3.5 pt-3" style="height: 208px">
                     <div v-for="(r, i) in revenue" :key="r.month" class="flex flex-1 flex-col items-center gap-1.5">
                         <div
                             class="w-full rounded-t-[8px] rounded-b-[3px]"
                             :class="i === revenue.length - 1 ? 'bg-[#15966b]' : 'bg-[#e5f4ed]'"
                             :style="{ height: `${(r.value / maxRevenue) * 165.6}px` }"
                             role="img"
-                            :aria-label="`${r.month}: ${r.value}k`"
+                            :aria-label="`${r.month}: ${formatMoney(r.value)}`"
                         />
                         <span class="text-xs text-[#6b7773]">{{ r.month }}</span>
                     </div>
@@ -145,6 +170,9 @@ const lowStock = [
                 <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">
                     MtaaFlow noticed
                 </h2>
+                <p v-if="insights.length === 0" class="text-sm text-[#6b7773]">
+                    Nothing to report yet. Tips appear as you add invoices.
+                </p>
                 <div
                     v-for="insight in insights"
                     :key="insight.title"
@@ -174,14 +202,17 @@ const lowStock = [
                     <span>Amount</span>
                     <span>Status</span>
                 </div>
+                <p v-if="invoices.length === 0" class="py-4 text-center text-sm text-[#6b7773]">
+                    No invoices yet.
+                </p>
                 <div
                     v-for="inv in invoices"
-                    :key="inv.no"
+                    :key="inv.id"
                     class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-sm text-[#202a27]"
                 >
-                    <span>{{ inv.no }}</span>
-                    <span class="flex-1">{{ inv.customer }}</span>
-                    <span>{{ inv.amount }}</span>
+                    <span>{{ inv.number }}</span>
+                    <span class="flex-1">{{ inv.customer_name }}</span>
+                    <span>{{ formatMoney(inv.total_amount) }}</span>
                     <StatusBadge :status="inv.status" />
                 </div>
             </section>
@@ -194,14 +225,17 @@ const lowStock = [
                     <span class="flex-1">Customer</span>
                     <span>Amount</span>
                 </div>
+                <p v-if="transactions.length === 0" class="py-4 text-center text-sm text-[#6b7773]">
+                    No payments yet.
+                </p>
                 <div
                     v-for="t in transactions"
-                    :key="t.label"
+                    :key="t.id"
                     class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-sm"
                 >
                     <span class="flex-1 text-[#202a27]">{{ t.label }}</span>
                     <span class="font-semibold" :class="t.failed ? 'text-[#b4432f]' : 'text-[#0d6b4a]'">
-                        {{ t.amount }}
+                        {{ t.failed ? '' : '+' }}{{ formatMoney(t.amount) }}
                     </span>
                 </div>
             </section>
@@ -213,6 +247,9 @@ const lowStock = [
                 <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">
                     Top sellers
                 </h2>
+                <p v-if="topSellers.length === 0" class="py-4 text-center text-sm text-[#6b7773]">
+                    No sales data yet.
+                </p>
                 <div v-for="p in topSellers" :key="p.name" class="flex flex-col gap-[5px]">
                     <p class="text-sm text-[#202a27]">{{ p.name }} · {{ p.sold }} sold</p>
                     <div class="h-1.5 w-full overflow-hidden rounded-[9px] bg-[#e6e4dc]">
@@ -229,15 +266,18 @@ const lowStock = [
                     <span class="flex-1">Product</span>
                     <span>Stock</span>
                 </div>
+                <p v-if="lowStock.length === 0" class="py-4 text-center text-sm text-[#6b7773]">
+                    Nothing is running low.
+                </p>
                 <div
                     v-for="item in lowStock"
-                    :key="item.product"
+                    :key="item.id"
                     class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-sm text-[#202a27]"
                 >
                     <span class="flex-1">{{ item.product }}</span>
                     <span
                         class="inline-flex rounded-full px-2.5 py-[3px] text-xs font-semibold whitespace-nowrap"
-                        :class="item.tone === 'danger' ? 'bg-[#f9e4df] text-[#b4432f]' : 'bg-[#fbf0da] text-[#b7791f]'"
+                        :class="item.left <= 5 ? 'bg-[#f9e4df] text-[#b4432f]' : 'bg-[#fbf0da] text-[#b7791f]'"
                     >
                         {{ item.left }} left
                     </span>
