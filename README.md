@@ -206,5 +206,3 @@ php artisan test
 Released under the MIT License. 
 
 ---
-
-*MtaaFlow AI is a working project name.*
