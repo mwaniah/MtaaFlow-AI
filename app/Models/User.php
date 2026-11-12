@@ -42,22 +42,26 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     // One user can have many customers
+    /** @return HasMany<Customer, $this> */
     public function customers(): HasMany
     {
         return $this->hasMany(Customer::class);
     }
 
     // One user can create many invoices
+    /** @return HasMany<Invoice, $this> */
     public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class);
     }
 
+    /** @return HasMany<PendingAction, $this> */
     public function pendingActions(): HasMany
     {
         return $this->hasMany(PendingAction::class);
     }
 
+    /** @return HasMany<Product, $this> */
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
@@ -69,6 +73,7 @@ class User extends Authenticatable implements PasskeyUser
         return $this->role === 'admin';
     }
 
+    /** @return HasMany<AiConversation, $this> */
     public function aiConversations(): HasMany
     {
         return $this->hasMany(AiConversation::class);

@@ -34,11 +34,13 @@ class Product extends Model
         ];
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return HasMany<InventoryAdjustment, $this> */
     public function adjustments(): HasMany
     {
         return $this->hasMany(InventoryAdjustment::class);

@@ -21,6 +21,7 @@ class AiMessage extends Model
         ];
     }
 
+    /** @return BelongsTo<AiConversation, $this> */
     public function conversation(): BelongsTo
     {
         return $this->belongsTo(

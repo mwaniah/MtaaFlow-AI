@@ -1,0 +1,841 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Access to an undefined property App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product\:\:\$invoice_number\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product\:\:\$items\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product\:\:\$quantity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Payment\:\:\$total\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Call to an undefined method App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product\:\:invoices\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Call to an undefined method App\\Models\\Customer\|App\\Models\\Product\:\:invoices\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Cannot call method toISOString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\PaymentReminder\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Parameter \#1 \$invoice of method App\\Actions\\AI\\AccountOperations\:\:ensureDraftInvoice\(\) expects App\\Models\\Invoice, App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Parameter \#1 \$invoice of method App\\Actions\\AI\\AccountOperations\:\:invoiceDraft\(\) expects App\\Models\\Invoice, App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Parameter \#1 \$invoice of method App\\Actions\\AI\\AccountOperations\:\:invoiceSnapshot\(\) expects App\\Models\\Invoice, App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Parameter \#1 \$validated of method App\\Actions\\Invoices\\InvoiceWriter\:\:totalMinor\(\) expects array\{currency\: string, items\: array\<int, array\{description\: string, quantity\: int\|string, unit_price\: float\|int\|string\}\>\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Parameter \#2 \$product of method App\\Actions\\Inventory\\StockAdjuster\:\:handle\(\) expects App\\Models\\Product, App\\Models\\Product\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Product\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Parameter \#2 \$record of method App\\Actions\\AI\\AccountOperations\:\:validateRecordChanges\(\) expects App\\Models\\Customer\|App\\Models\\Product, App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\PaymentReminder\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:all\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:values\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Actions/AI/AccountOperations.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product\:\:\$invoice_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Customer\|App\\Models\\Invoice\|App\\Models\\Product\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$address\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$amount\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$currency\.$#'
+			identifier: property.notFound
+			count: 10
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$due_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$invoice_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$issue_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$items\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$low_stock_threshold\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$payments\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$quantity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$shares\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$shares_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sku\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Cannot call method isFuture\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on Carbon\\CarbonImmutable\|string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Cannot call method toISOString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:dates\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:dates\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany but does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:dates\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:dates\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:financialFilters\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:financialFilters\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany but does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:invoiceFilters\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:invoiceFilters\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany but does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:paymentQuery\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:paymentQuery\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Eloquent\\Builder\|Illuminate\\Database\\Eloquent\\Relations\\HasMany\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:recordFilters\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskAccountContext\:\:recordFilters\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany but does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 3
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\?\: int\<0, max\>, invoice_id\?\: int\<0, max\>, invoice_number\: string, currency\: string, amount\: string, status\: string, date\: string\|null\}, Closure\(App\\Models\\Payment\)\: array\{id\?\: int\<0, max\>, invoice_id\?\: int\<0, max\>, invoice_number\: string, currency\: string, amount\: string, status\: string, date\: string\|null\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{invoice_number\: string, status\: string, sent_at\: mixed\}, Closure\(App\\Models\\PaymentReminder\)\: array\{invoice_number\: string, status\: string, sent_at\: mixed\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Parameter \#1 \$invoice of method App\\Actions\\Invoices\\InvoiceBalance\:\:totalMinor\(\) expects App\\Models\\Invoice, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Parameter \#1 \$lines of method App\\Actions\\AI\\AskAccountContext\:\:listing\(\) expects list\<string\>, array\<int, non\-falsy\-string\> given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Parameter \#1 \$lines of method App\\Actions\\AI\\AskAccountContext\:\:listing\(\) expects list\<string\>, non\-empty\-array\<string\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Parameter \#1 \$relations of method Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>\:\:with\(\) expects ''customer''\|''payments''\|array\<''customer''\|''payments''\|int, array\<mixed\>\|\(Closure\(Illuminate\\Database\\Eloquent\\Relations\\Relation\<\*, \*, \*\>\)\: mixed\)\|string\>, array\{customer\: Closure\(Illuminate\\Database\\Eloquent\\Relations\\BelongsTo\)\: Illuminate\\Database\\Eloquent\\Relations\\BelongsTo, payments\: Closure\(Illuminate\\Database\\Eloquent\\Relations\\HasMany\)\: Illuminate\\Database\\Eloquent\\Relations\\HasMany\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Parameter \#1 \$relations of method Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>\:\:with\(\) expects ''shares''\|array\<''shares''\|int, array\<mixed\>\|\(Closure\(Illuminate\\Database\\Eloquent\\Relations\\Relation\<\*, \*, \*\>\)\: mixed\)\|string\>, array\{shares\: Closure\(Illuminate\\Database\\Eloquent\\Relations\\HasMany\)\: Illuminate\\Database\\Eloquent\\Relations\\HasMany\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 3
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:all\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 3
+			path: app/Actions/AI/AskAccountContext.php
+
+		-
+			message: '#^Comparison operation "\<" between 0\|1 and 2 is always true\.$#'
+			identifier: smaller.alwaysTrue
+			count: 1
+			path: app/Actions/AI/AskAssistant.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: mixed$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Actions/AI/AskAssistant.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Actions/AI/AskAssistant.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskConversation\:\:complete\(\) has parameter \$reply with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Actions/AI/AskConversation.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskConversation\:\:complete\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Actions/AI/AskConversation.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskConversation\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Actions/AI/AskConversation.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskConversation\:\:history\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Actions/AI/AskConversation.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskConversation\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Actions/AI/AskConversation.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskConversation\:\:remember\(\) has parameter \$reply with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Actions/AI/AskConversation.php
+
+		-
+			message: '#^Method App\\Actions\\AI\\AskConversation\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Actions/AI/AskConversation.php
+
+		-
+			message: '#^Parameter \#1 \$metadata of method App\\Actions\\AI\\AskConversation\:\:withoutConfirmationTokens\(\) expects array\<string, mixed\>, array\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/AI/AskConversation.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Actions/AI/GeminiProvider.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Actions/AI/GeminiProvider.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Actions/Payments/PayPalClient.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Actions/Payments/PayPalClient.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$currency\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$customer\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$due_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$invoice_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$issue_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$total\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Access to protected property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$items\.$#'
+			identifier: property.protected
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$reply$#'
+			identifier: parameter.notFound
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<\(int\|string\),mixed\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of static method Illuminate\\Database\\Connection\:\:transaction\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Parameter \#2 \$attributes of method App\\Actions\\Invoices\\InvoiceWriter\:\:validate\(\) expects array\<string, mixed\>, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Parameter \#3 \$history of method App\\Actions\\AI\\AskAssistant\:\:respond\(\) expects list\<array\{role\: string, content\: string\}\>, array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<\(int\|string\),array\<string, mixed\>\>\:\:all\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<\(int\|string\),mixed\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Return type of call to static method Illuminate\\Database\\Connection\:\:transaction\(\) contains unresolvable type\.$#'
+			identifier: staticMethod.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/AIController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\CustomerController\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/CustomerController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\CustomerController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/CustomerController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\CustomerController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/CustomerController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\CustomerController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/CustomerController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\CustomerController\:\:update\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/CustomerController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Call to an undefined method App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:newQuery\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:approve\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:approve\(\) has parameter \$id with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:create\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:destroy\(\) has parameter \$id with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:edit\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:edit\(\) has parameter \$id with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:ensureDraft\(\) has parameter \$invoice with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:show\(\) has parameter \$id with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:update\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\InvoiceController\:\:update\(\) has parameter \$id with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Parameter \#1 \$invoice of method App\\Actions\\Invoices\\InvoiceWriter\:\:approve\(\) expects App\\Models\\Invoice, App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Parameter \#1 \$invoice of method App\\Actions\\Invoices\\InvoiceWriter\:\:updateDraft\(\) expects App\\Models\\Invoice, App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/InvoiceController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$customer\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/InvoiceShareController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$invoice_number\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/InvoiceShareController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/InvoiceShareController.php
+
+		-
+			message: '#^Call to an undefined method App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\>\:\:shares\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: app/Http/Controllers/InvoiceShareController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Payment\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: '#^Parameter \#2 \$invoice of method App\\Http\\Controllers\\PaymentController\:\:createOrderForInvoice\(\) expects App\\Models\\Invoice, App\\Models\\Invoice\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Invoice\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Payment\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:values\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/PaymentController.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/ReportsController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>locale" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Middleware/HandleLocale.php
+
+		-
+			message: '#^Parameter \#2 \$string of function explode expects string, bool\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: config/sanctum.php
