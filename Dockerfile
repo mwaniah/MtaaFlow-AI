@@ -1,7 +1,9 @@
-FROM php:8.3-cli
+FROM php:8.4-cli
 
-RUN apt-get update && apt-get install -y git unzip curl libzip-dev \
- && docker-php-ext-install zip bcmath \
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions zip bcmath intl gd exif pcntl pdo_sqlite
+
+RUN apt-get update && apt-get install -y git unzip curl \
  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get install -y nodejs \
  && rm -rf /var/lib/apt/lists/*
@@ -11,12 +13,12 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction \
- && cp .env.example .env \
- && php artisan key:generate \
- && npm ci \
- && npm run build \
- && rm -rf .env node_modules \
+RUN cp .env.example .env
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN php artisan key:generate
+RUN npm ci
+RUN npm run build
+RUN rm -rf .env node_modules \
  && touch database/database.sqlite \
  && chmod -R 775 storage bootstrap/cache database
 
