@@ -180,3 +180,12 @@ Route::middleware(['auth'])->group(function () {
     Route::inertia('ask', 'AskMtaaFlow/Index')->name('ask.index');
     Route::get('insights', fn() => redirect()->route('reports.index'))->name('insights.index');
 });
+
+Route::get('/_paypal-check', fn () => response()->json([
+    'client_id_set' => filled(config('services.paypal.client_id')),
+    'client_secret_set' => filled(config('services.paypal.client_secret')),
+    'mode' => config('services.paypal.mode'),
+    'base_url' => config('services.paypal.base_url'),
+    'app_env' => config('app.env'),
+    'app_name' => config('app.name'),
+]));
