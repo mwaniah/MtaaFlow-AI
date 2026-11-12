@@ -1,5 +1,5 @@
-import { computed, ref } from "vue";
-import english from "../locales/en.json" with { type: "json" };
+import { computed, ref } from 'vue';
+import english from '../locales/en.json' with { type: 'json' };
 
 const defaultTranslate = (key: string): string =>
     english[key as keyof typeof english] ?? key;
@@ -11,13 +11,13 @@ export type AskReply = {
     proposal?: ActionProposal;
 };
 export type ActionProposal = {
-    intent: "action" | "invoice";
+    intent: 'action' | 'invoice';
     preview: Record<string, unknown>;
-    confirmation: { token: string; expires_at: string };
+    confirmation: { token?: string; expires_at: string };
 };
 export type ChatMessage = {
     id: number;
-    role: "user" | "assistant";
+    role: 'user' | 'assistant';
     text: string;
     invoice?: boolean;
     error?: boolean;
@@ -29,18 +29,18 @@ export type AskRequest = (
 ) => Promise<AskReply>;
 
 export function createConversationId(
-    source: Pick<Crypto, "getRandomValues"> &
-        Partial<Pick<Crypto, "randomUUID">> = crypto,
+    source: Pick<Crypto, 'getRandomValues'> &
+        Partial<Pick<Crypto, 'randomUUID'>> = crypto,
 ): string {
-    if (typeof source.randomUUID === "function") {
+    if (typeof source.randomUUID === 'function') {
         return source.randomUUID();
     }
     const bytes = source.getRandomValues(new Uint8Array(16));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     const hex = Array.from(bytes, (value) =>
-        value.toString(16).padStart(2, "0"),
-    ).join("");
+        value.toString(16).padStart(2, '0'),
+    ).join('');
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
@@ -55,8 +55,8 @@ export function useAskConversation(
     const conversationId = ref<string>(createId());
     const firstQuestion = computed(
         () =>
-            messages.value.find((message) => message.role === "user")?.text ??
-            translate("ask.currentConversation"),
+            messages.value.find((message) => message.role === 'user')?.text ??
+            translate('ask.currentConversation'),
     );
     let messageId = 0;
 
@@ -66,7 +66,7 @@ export function useAskConversation(
             return false;
         }
         busy.value = true;
-        messages.value.push({ id: ++messageId, role: "user", text });
+        messages.value.push({ id: ++messageId, role: 'user', text });
         try {
             const reply = await request(text, conversationId.value);
             if (
@@ -79,20 +79,20 @@ export function useAskConversation(
             }
             messages.value.push({
                 id: ++messageId,
-                role: "assistant",
+                role: 'assistant',
                 text: reply.answer,
-                invoice: reply.intent === "invoice",
+                invoice: reply.intent === 'invoice',
                 ...(reply.proposal ? { proposal: reply.proposal } : {}),
             });
         } catch (error) {
             messages.value.push({
                 id: ++messageId,
-                role: "assistant",
+                role: 'assistant',
                 error: true,
                 text:
                     error instanceof Error
                         ? error.message
-                        : translate("ask.connection"),
+                        : translate('ask.connection'),
             });
         } finally {
             messages.value = messages.value.slice(-40);
@@ -149,32 +149,32 @@ export function parseAskReply(
     payload: unknown,
     translate: (key: string) => string = defaultTranslate,
 ): AskReply {
-    if (!payload || typeof payload !== "object") {
-        throw new Error(translate("ask.unreadable"));
+    if (!payload || typeof payload !== 'object') {
+        throw new Error(translate('ask.unreadable'));
     }
     const data = payload as Record<string, unknown>;
-    const intent = typeof data.intent === "string" ? data.intent : undefined;
-    const answer = typeof data.answer === "string" ? data.answer.trim() : "";
-    if (!answer && intent === "invoice") {
+    const intent = typeof data.intent === 'string' ? data.intent : undefined;
+    const answer = typeof data.answer === 'string' ? data.answer.trim() : '';
+    if (!answer && intent === 'invoice') {
         return {
-            answer: translate("ask.invoiceForm"),
+            answer: translate('ask.invoiceForm'),
             intent,
             conversation_id:
-                typeof data.conversation_id === "string"
+                typeof data.conversation_id === 'string'
                     ? data.conversation_id
                     : undefined,
         };
     }
     if (!answer || isStructuredData(answer)) {
-        throw new Error(translate("ask.noReadableAnswer"));
+        throw new Error(translate('ask.noReadableAnswer'));
     }
     return {
         answer,
         intent,
-        ...((intent === "action" || intent === "invoice") &&
+        ...((intent === 'action' || intent === 'invoice') &&
         data.confirmation &&
-        typeof data.confirmation === "object" &&
-        typeof (data.confirmation as Record<string, unknown>).token === "string"
+        typeof data.confirmation === 'object' &&
+        typeof (data.confirmation as Record<string, unknown>).token === 'string'
             ? {
                   proposal: {
                       intent,
@@ -183,24 +183,24 @@ export function parseAskReply(
                           unknown
                       >,
                       confirmation:
-                          data.confirmation as ActionProposal["confirmation"],
+                          data.confirmation as ActionProposal['confirmation'],
                   } as ActionProposal,
               }
             : {}),
         conversation_id:
-            typeof data.conversation_id === "string"
+            typeof data.conversation_id === 'string'
                 ? data.conversation_id
                 : undefined,
     };
 }
 
 function isStructuredData(text: string): boolean {
-    if (!text.startsWith("{") && !text.startsWith("[")) {
+    if (!text.startsWith('{') && !text.startsWith('[')) {
         return false;
     }
     try {
         const value: unknown = JSON.parse(text);
-        return value !== null && typeof value === "object";
+        return value !== null && typeof value === 'object';
     } catch {
         return false;
     }
@@ -209,5 +209,5 @@ function isStructuredData(text: string): boolean {
 export function conversationScrollBehavior(
     reducedMotion: boolean,
 ): ScrollBehavior {
-    return reducedMotion ? "instant" : "smooth";
+    return reducedMotion ? 'instant' : 'smooth';
 }

@@ -178,13 +178,16 @@ test('account follow-ups re-query current records and do not send old customer n
     $user = User::factory()->create();
     $user->customers()->create(['name' => 'Private Account Name', 'email' => 'private@example.test']);
     $conversationId = (string) Str::uuid();
-    $this->actingAs($user)->postJson(route('ai.ask'), ['question' => 'Who are my customers?', 'conversation_id' => $conversationId])->assertOk();
+    $this->actingAs($user)->postJson(route('ai.ask'), [
+        'question' => 'Who are my customers? Include Private Account Name and private@example.test.',
+        'conversation_id' => $conversationId,
+    ])->assertOk();
     $user->customers()->create(['name' => 'New Customer']);
 
     $this->postJson(route('ai.ask'), ['question' => 'How many are there now?', 'conversation_id' => $conversationId])
         ->assertOk()->assertJsonPath('data.count', 2);
     $last = Http::recorded()->last()[0]['messages'][1]['content'];
-    expect($last)->toContain('query customers')->not->toContain('Private Account Name', 'private@example.test');
+    expect($last)->toContain('Previous account query: customers')->not->toContain('Private Account Name', 'private@example.test');
     Http::assertSentCount(2);
 });
 
@@ -204,6 +207,8 @@ test('calendar follow-ups can filter freshly retrieved earnings to last month', 
         ->assertOk()->assertJsonPath('data.totals_by_currency.0.total', '35.00');
     $this->postJson(route('ai.ask'), ['question' => 'What about last month?', 'conversation_id' => $conversationId])
         ->assertOk()->assertJsonPath('data.totals_by_currency.0.total', '25.00');
+    $last = Http::recorded()->last()[0]['messages'][1]['content'];
+    expect($last)->toContain('Previous account query: revenue')->not->toContain('35.00', '25.00', 'DATED');
     Http::assertSentCount(2);
 });
 
@@ -211,10 +216,47 @@ test('a different user cannot inherit conversation content even when the same UU
     fakeAskConversationRoutes(['intent' => 'question', 'message' => 'PRIVATE_FIRST_ACCOUNT_CONTEXT'], ['intent' => 'question', 'message' => 'Please clarify the topic.']);
     $conversationId = (string) Str::uuid();
     $this->actingAs(User::factory()->create())->postJson(route('ai.ask'), ['question' => 'Help me plan my portfolio.', 'conversation_id' => $conversationId])->assertOk();
-    $this->actingAs(User::factory()->create())->postJson(route('ai.ask'), ['question' => 'Tell me more.', 'conversation_id' => $conversationId])->assertOk();
+    $this->actingAs(User::factory()->create())->postJson(route('ai.ask'), ['question' => 'Tell me more.', 'conversation_id' => $conversationId])->assertNotFound();
 
-    expect(Http::recorded()->last()[0]['messages'][1]['content'])->not->toContain('PRIVATE_FIRST_ACCOUNT_CONTEXT');
-    Http::assertSentCount(2);
+    Http::assertSentCount(1);
+});
+
+test('confirmation tokens remain usable but are not stored or returned in conversation history', function () {
+    fakeAskConversationRoutes([
+        'intent' => 'action',
+        'action' => 'customer.create',
+        'action_data' => ['name' => 'Private Proposal', 'phone' => '+44 20 7946 0958'],
+    ]);
+    $user = User::factory()->create();
+    $conversationId = (string) Str::uuid();
+
+    $proposal = $this->actingAs($user)->postJson(route('ai.ask'), [
+        'question' => 'Add this customer.',
+        'conversation_id' => $conversationId,
+    ])->assertOk();
+    $token = $proposal->json('confirmation.token');
+    $message = $user->aiConversations()
+        ->findOrFail($conversationId)
+        ->messages()
+        ->where('role', 'assistant')
+        ->firstOrFail();
+
+    expect(array_key_exists('token', $message->metadata['proposal']['confirmation']))->toBeFalse();
+
+    $legacyMetadata = $message->metadata;
+    $legacyMetadata['proposal']['confirmation']['token'] = $token;
+    $message->update(['metadata' => $legacyMetadata]);
+
+    $history = $this->getJson(route('ai.conversations.show', $conversationId))->assertOk();
+    expect($history->getContent())->not->toContain($token);
+
+    $this->postJson(route('ai.actions.confirm'), ['confirmation_token' => $token])
+        ->assertOk()->assertJsonPath('already_confirmed', false);
+    $this->assertDatabaseHas('customers', [
+        'user_id' => $user->id,
+        'name' => 'Private Proposal',
+        'phone' => '+44 20 7946 0958',
+    ]);
 });
 
 test('new chat identifiers start without borrowing another active chats history', function () {
@@ -237,6 +279,10 @@ test('conversation history expires and cannot grow beyond its bounded context wi
     $this->travel(31)->minutes();
     $this->postJson(route('ai.ask'), ['question' => 'NEW_AFTER_EXPIRY', 'conversation_id' => $conversationId])->assertOk();
     expect(Http::recorded()->last()[0]['messages'][1]['content'])->not->toContain('Useful guidance.');
+    $this->getJson(route('ai.conversations.show', $conversationId))
+        ->assertOk()
+        ->assertJsonCount(18, 'messages')
+        ->assertJsonPath('messages.0.content', 'UNIQUE_OLDEST_CONTEXT');
     Http::assertSentCount(9);
 });
 

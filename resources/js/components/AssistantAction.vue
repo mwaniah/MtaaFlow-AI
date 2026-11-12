@@ -55,7 +55,8 @@ function rows(value: unknown, prefix = ''): { label: string; value: string }[] {
 }
 const details = computed(() => rows(props.proposal.preview));
 async function submit(confirmed: boolean) {
-    if (busy.value || finished.value) return;
+    const token = props.proposal.confirmation.token;
+    if (busy.value || finished.value || !token) return;
     busy.value = true;
     error.value = '';
     try {
@@ -68,7 +69,7 @@ async function submit(confirmed: boolean) {
                     ? confirmInvoice()
                     : confirm()
                 : cancel(),
-            { confirmation_token: props.proposal.confirmation.token },
+            { confirmation_token: token },
         );
         finished.value = true;
         notice.value = t(confirmed ? 'ask.confirmed' : 'ask.cancelled');
@@ -104,7 +105,10 @@ async function submit(confirmed: boolean) {
             >
         </dl>
         <p class="text-xs text-muted-foreground">{{ t('ask.noChanges') }}</p>
-        <div v-if="!finished" class="flex flex-wrap gap-2">
+        <div
+            v-if="!finished && props.proposal.confirmation.token"
+            class="flex flex-wrap gap-2"
+        >
             <button
                 type="button"
                 class="mf-button"

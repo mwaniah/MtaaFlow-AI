@@ -3,6 +3,7 @@
 namespace App\Actions\AI;
 
 use App\Models\AiConversation;
+use App\Models\AiMessage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -33,18 +34,41 @@ class AskConversation
             ->aiConversations()
             ->find($conversationId);
 
-        if (!$conversation) {
+        if (! $conversation) {
             return [];
         }
 
-        return $conversation->messages()
+        if ($conversation->updated_at?->lt(now()->subMinutes(30))) {
+            return [];
+        }
+
+        $messages = $conversation->messages()
             ->orderByDesc('id')
             ->limit(self::MaximumMessages)
             ->get()
             ->reverse()
-            ->map(fn($message) => [
+            ->values();
+
+        return $messages
+            ->filter(function (AiMessage $message, int $index) use ($messages): bool {
+                if ($message->role !== 'user') {
+                    return true;
+                }
+
+                $next = $messages->get($index + 1);
+
+                if (! $next || $next->role !== 'assistant') {
+                    return true;
+                }
+
+                $nextIntent = $next->metadata['intent'] ?? null;
+
+                return ! in_array($nextIntent, ['account_read', 'invoice', 'action'], true)
+                    && ! ($nextIntent === 'conversion' && isset($next->metadata['earnings_conversion_target']));
+            })
+            ->map(fn (AiMessage $message) => [
                 'role' => $message->role,
-                'content' => Str::limit($message->content, 6000, ''),
+                'content' => Str::limit($this->contextContent($message), 6000, ''),
             ])
             ->values()
             ->all();
@@ -59,7 +83,7 @@ class AskConversation
             ->aiConversations()
             ->find($conversationId);
 
-        if (!$conversation) {
+        if (! $conversation) {
             return $reply;
         }
 
@@ -80,7 +104,7 @@ class AskConversation
                 $draft['action_data'],
                 array_filter(
                     $reply['action_data'],
-                    fn($value) => $value !== null
+                    fn ($value) => $value !== null
                 )
             );
         }
@@ -113,14 +137,31 @@ class AskConversation
             'intent' => $reply['intent'] ?? null,
         ];
 
+        if (($reply['intent'] ?? null) === 'account_read' && is_string($reply['query'] ?? null)) {
+            $metadata['query'] = $reply['query'];
+        }
+
+        $earningsTarget = $reply['earnings_context']['to'] ?? null;
+
+        if (is_string($earningsTarget)) {
+            $earningsTarget = strtoupper(trim($earningsTarget));
+
+            if (preg_match('/\A[A-Z]{3}\z/', $earningsTarget) === 1) {
+                $metadata['earnings_conversion_target'] = $earningsTarget;
+            }
+        }
+
         if (
             in_array($reply['intent'] ?? null, ['invoice', 'action'], true)
             && isset($reply['confirmation']['token'])
         ) {
+            $confirmation = $reply['confirmation'];
+            unset($confirmation['token'], $confirmation['confirmation_token']);
+
             $metadata['proposal'] = [
                 'intent' => $reply['intent'],
                 'preview' => $reply['preview'] ?? $reply['draft'] ?? [],
-                'confirmation' => $reply['confirmation'],
+                'confirmation' => $confirmation,
             ];
         }
 
@@ -136,7 +177,7 @@ class AskConversation
 
         $conversation->messages()->create([
             'role' => 'assistant',
-            'content' => $this->contextAnswer($reply),
+            'content' => (string) ($reply['answer'] ?? $reply['message'] ?? ''),
             'metadata' => $metadata,
         ]);
 
@@ -163,7 +204,13 @@ class AskConversation
             'conversation' => $conversation,
             'messages' => $conversation->messages()
                 ->orderBy('id')
-                ->get(['id', 'role', 'content', 'metadata', 'created_at']),
+                ->get(['id', 'role', 'content', 'metadata', 'created_at'])
+                ->map(function (AiMessage $message): array {
+                    $attributes = $message->toArray();
+                    $attributes['metadata'] = $this->withoutConfirmationTokens($attributes['metadata'] ?? []);
+
+                    return $attributes;
+                }),
         ]);
     }
 
@@ -180,25 +227,57 @@ class AskConversation
         ]);
     }
 
-    private function contextAnswer(array $reply): string
+    private function contextContent(AiMessage $message): string
     {
-        return match ($reply['intent'] ?? null) {
-            'account_read' =>
-                'Verified account records were retrieved. '
-                . 'Re-query Laravel for current account information. '
-                . ($reply['answer'] ?? ''),
+        if ($message->role !== 'assistant') {
+            return $message->content;
+        }
 
-            'invoice' =>
-                'An invoice review was prepared. '
-                . 'No invoice was created by this chat response. '
-                . ($reply['answer'] ?? ''),
+        $metadata = $message->metadata ?? [];
 
-            'action' =>
-                'An account action was proposed or needs clarification. '
-                . 'No change was executed. '
-                . ($reply['answer'] ?? ''),
-
-            default => (string) ($reply['answer'] ?? ''),
+        return match ($metadata['intent'] ?? null) {
+            'account_read' => 'Previous account query: '.(
+                in_array($metadata['query'] ?? null, [
+                    'customers',
+                    'invoices',
+                    'outstanding_invoices',
+                    'payments',
+                    'revenue',
+                    'products',
+                    'low_stock',
+                    'reminders',
+                    'summary',
+                ], true)
+                    ? $metadata['query']
+                    : 'account records'
+            ),
+            'conversion' => is_string($metadata['earnings_conversion_target'] ?? null)
+                ? 'Previous earnings conversion to '.$metadata['earnings_conversion_target'].'.'
+                : 'A previous currency conversion was discussed.',
+            'invoice' => 'A previous invoice draft was prepared for review.',
+            'action' => 'A previous account action was proposed for review.',
+            default => $message->content,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     * @return array<string, mixed>
+     */
+    private function withoutConfirmationTokens(array $metadata): array
+    {
+        foreach ($metadata as $key => $value) {
+            if (in_array($key, ['token', 'confirmation_token'], true)) {
+                unset($metadata[$key]);
+
+                continue;
+            }
+
+            if (is_array($value)) {
+                $metadata[$key] = $this->withoutConfirmationTokens($value);
+            }
+        }
+
+        return $metadata;
     }
 }

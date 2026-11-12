@@ -1,4 +1,4 @@
-import type { ObjectDirective } from "vue";
+import type { ObjectDirective } from 'vue';
 
 const observers = new WeakMap<HTMLElement, IntersectionObserver>();
 const focusHandlers = new WeakMap<HTMLElement, () => void>();
@@ -6,12 +6,12 @@ const focusHandlers = new WeakMap<HTMLElement, () => void>();
 export const reveal: ObjectDirective<HTMLElement, number | undefined> = {
     mounted(element, binding) {
         if (
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
-            !("IntersectionObserver" in window)
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+            !('IntersectionObserver' in window)
         )
             return;
         const show = () => {
-            element.dataset.mfReveal = "visible";
+            element.dataset.mfReveal = 'visible';
             observers.get(element)?.disconnect();
         };
         try {
@@ -21,11 +21,11 @@ export const reveal: ObjectDirective<HTMLElement, number | undefined> = {
                 },
                 { threshold: 0.08 },
             );
-            element.dataset.mfReveal = "pending";
+            element.dataset.mfReveal = 'pending';
             element.style.transitionDelay = `${Math.min(220, Math.max(0, binding.value ?? 0))}ms`;
             observers.set(element, observer);
             focusHandlers.set(element, show);
-            element.addEventListener("focusin", show);
+            element.addEventListener('focusin', show);
             observer.observe(element);
         } catch {
             show();
@@ -34,7 +34,7 @@ export const reveal: ObjectDirective<HTMLElement, number | undefined> = {
     unmounted(element) {
         observers.get(element)?.disconnect();
         const handler = focusHandlers.get(element);
-        if (handler) element.removeEventListener("focusin", handler);
+        if (handler) element.removeEventListener('focusin', handler);
         observers.delete(element);
         focusHandlers.delete(element);
     },
