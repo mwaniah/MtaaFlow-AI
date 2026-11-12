@@ -1,7 +1,7 @@
 # MtaaFlow AI
 
 **AI-assisted payment and invoice workflow for small businesses.**
-Type an order in plain language, review what the AI extracted, save it as an invoice, and collect payment through PayPal Sandbox.
+Type an order in plain language, review what the AI extracted, save it as an invoice and collect payment through PayPal Sandbox.
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
