@@ -8,8 +8,8 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 | | |
 |---|---|
 | **Live demo** | https://mtaaflow-ai-1.onrender.com/ |
-| **Demo video** | [TODO: YouTube link] |
-| **Devpost submission** | [TODO: link] |
+| **Demo video** | https://www.youtube.com/watch?v=-PRYQRVCdgY |
+| **Devpost submission** | 😭didn't make it |
 
 > The demo is hosted on Render's free tier. If it has been idle, the first load can take 30-60 seconds while the instance wakes up. All payments use the **PayPal Sandbox**; no real money moves.
 
