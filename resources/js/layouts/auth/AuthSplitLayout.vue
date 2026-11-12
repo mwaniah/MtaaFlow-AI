@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LanguageSelector from '@/components/LanguageSelector.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { home } from '@/routes';
@@ -39,6 +40,9 @@ defineProps<{
                     <p class="text-sm text-muted-foreground" v-if="description">
                         {{ description }}
                     </p>
+                </div>
+                <div class="mb-6 flex justify-end">
+                    <LanguageSelector compact />
                 </div>
                 <slot />
             </div>

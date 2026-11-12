@@ -1,13 +1,32 @@
 <script setup lang="ts">
+import { translate as t } from '@/lib/i18n';
 import { Monitor, Moon, Sun } from '@lucide/vue';
 import { useAppearance } from '@/composables/useAppearance';
 
 const { appearance, updateAppearance } = useAppearance();
 
 const tabs = [
-    { value: 'light', Icon: Sun, label: 'Light' },
-    { value: 'dark', Icon: Moon, label: 'Dark' },
-    { value: 'system', Icon: Monitor, label: 'System' },
+    {
+        value: 'light',
+        Icon: Sun,
+        get label() {
+            return t('settings.light');
+        },
+    },
+    {
+        value: 'dark',
+        Icon: Moon,
+        get label() {
+            return t('settings.dark');
+        },
+    },
+    {
+        value: 'system',
+        Icon: Monitor,
+        get label() {
+            return t('settings.system');
+        },
+    },
 ] as const;
 </script>
 
@@ -27,7 +46,9 @@ const tabs = [
             ]"
         >
             <component :is="Icon" class="-ml-1 h-4 w-4" />
-            <span class="ml-1.5 text-sm">{{ label }}</span>
+            <span class="ml-1.5 text-sm">{{
+                t(t('interface.settings') + value)
+            }}</span>
         </button>
     </div>
 </template>

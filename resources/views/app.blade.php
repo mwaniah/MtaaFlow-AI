@@ -3,6 +3,8 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="account-locale" content="{{ auth()->user()?->locale }}">
+        <meta name="account-id" content="{{ auth()->id() }}">
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
         <script>
@@ -22,11 +24,11 @@
         {{-- Inline style to set the HTML background color based on our theme in app.css --}}
         <style>
             html {
-                background-color: oklch(1 0 0);
+                background-color: #faf9f6;
             }
 
             html.dark {
-                background-color: oklch(0.145 0 0);
+                background-color: #101f1a;
             }
         </style>
 

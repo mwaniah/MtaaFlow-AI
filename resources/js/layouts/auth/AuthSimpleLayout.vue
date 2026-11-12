@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LanguageSelector from '@/components/LanguageSelector.vue';
 import { Link } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { home } from '@/routes';
@@ -14,6 +15,9 @@ defineProps<{
         class="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10"
     >
         <div class="w-full max-w-sm">
+            <div class="mb-6 flex justify-end">
+                <LanguageSelector compact />
+            </div>
             <div class="flex flex-col gap-8">
                 <div class="flex flex-col items-center gap-4">
                     <Link

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { translate as t } from '@/lib/i18n';
 import { Head } from '@inertiajs/vue3';
 import AppearanceTabs from '@/components/AppearanceTabs.vue';
 import Heading from '@/components/Heading.vue';
@@ -8,7 +9,9 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Appearance settings',
+                get title() {
+                    return t('interface.appearance_settings');
+                },
                 href: edit(),
             },
         ],
@@ -17,15 +20,17 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Appearance settings" />
+    <Head :title="t('interface.appearance_settings')" />
 
-    <h1 class="sr-only">Appearance settings</h1>
+    <h1 class="sr-only">{{ t('interface.appearance_settings') }}</h1>
 
     <div class="space-y-6">
         <Heading
             variant="small"
-            title="Appearance settings"
-            description="Update the appearance settings for your account"
+            :title="t('interface.appearance_settings')"
+            :description="
+                t('interface.update_the_appearance_settings_for_your_account')
+            "
         />
         <AppearanceTabs />
     </div>

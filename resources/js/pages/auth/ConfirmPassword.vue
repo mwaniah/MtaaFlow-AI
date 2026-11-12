@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { translate as t } from '@/lib/i18n';
 import { Form, Head } from '@inertiajs/vue3';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
@@ -14,22 +15,27 @@ import PasskeyVerify from '@/components/PasskeyVerify.vue';
 
 defineOptions({
     layout: {
-        title: 'Confirm password',
-        description:
-            'This is a secure area of the application. Please confirm your password before continuing.',
+        get title() {
+            return t('auth.confirmPassword');
+        },
+        get description() {
+            return t(
+                'interface.this_is_a_secure_area_of_the_application_please_confirm_your_password_before_continuing',
+            );
+        },
     },
 });
 </script>
 
 <template>
-    <Head title="Confirm password" />
+    <Head :title="t('auth.confirmPassword')" />
 
     <PasskeyVerify
         :routes="{
             options: confirmOptions(),
             submit: confirmStore(),
         }"
-        label="Confirm with passkey"
+        :label="t('interface.confirm_with_passkey')"
         loading-label="Confirming..."
         separator="Or confirm with password"
     />
@@ -41,7 +47,7 @@ defineOptions({
     >
         <div class="space-y-6">
             <div class="grid gap-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{{ t('auth.password') }}</Label>
                 <PasswordInput
                     id="password"
                     name="password"
@@ -60,9 +66,10 @@ defineOptions({
                     :disabled="processing"
                     data-test="confirm-password-button"
                 >
-                    <Spinner v-if="processing" />
-                    Confirm password
-                </Button>
+                    <Spinner v-if="processing" />{{
+                        t('auth.confirmPassword')
+                    }}</Button
+                >
             </div>
         </div>
     </Form>
