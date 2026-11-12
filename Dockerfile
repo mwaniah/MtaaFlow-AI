@@ -23,4 +23,4 @@ RUN rm -rf .env node_modules \
  && chmod -R 775 storage bootstrap/cache database
 
 ENV PHP_CLI_SERVER_WORKERS=4
-CMD ["sh", "-c", "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
+CMD ["sh", "-c", "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && php -S 0.0.0.0:${PORT:-10000} -t public vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"]
