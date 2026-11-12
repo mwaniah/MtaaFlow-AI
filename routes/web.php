@@ -125,6 +125,23 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('throttle:20,1')
         ->name('ai.ask');
 
+
+    Route::get('ai/conversations', [
+        \App\Actions\AI\AskConversation::class,
+        'index'
+    ])->name('ai.conversations.index');
+
+    Route::get('ai/conversations/{id}', [
+        \App\Actions\AI\AskConversation::class,
+        'show'
+    ])->whereUuid('id')->name('ai.conversations.show');
+
+    Route::delete('ai/conversations/{id}', [
+        \App\Actions\AI\AskConversation::class,
+        'destroy'
+    ])->whereUuid('id')->name('ai.conversations.destroy');
+
+
     Route::get('payment-reminders', [PaymentReminderController::class, 'index'])
         ->name('payment-reminders.index');
 
@@ -155,11 +172,11 @@ Route::middleware(['auth'])->group(function () {
         ->name('products.adjustments.store');
 });
 
-require __DIR__.'/settings.php';
+require __DIR__ . '/settings.php';
 
 // Additional authenticated application pages.
 Route::middleware(['auth'])->group(function () {
     Route::inertia('inventory', 'Inventory/Index')->name('inventory.index');
     Route::inertia('ask', 'AskMtaaFlow/Index')->name('ask.index');
-    Route::get('insights', fn () => redirect()->route('reports.index'))->name('insights.index');
+    Route::get('insights', fn() => redirect()->route('reports.index'))->name('insights.index');
 });

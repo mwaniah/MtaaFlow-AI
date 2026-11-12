@@ -68,4 +68,9 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->role === 'admin';
     }
+
+    public function aiConversations(): HasMany
+    {
+        return $this->hasMany(AiConversation::class);
+    }
 }

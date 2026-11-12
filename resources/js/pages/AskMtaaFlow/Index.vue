@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { translate as t } from '@/lib/i18n';
-import { computed, nextTick, ref } from 'vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { translate as t } from "@/lib/i18n";
+import { computed, nextTick, onMounted, ref } from "vue";
+import { Head, Link, usePage } from "@inertiajs/vue3";
 import {
     ArrowRight,
     ArrowUp,
@@ -12,17 +12,18 @@ import {
     ShieldCheck,
     Sparkles,
     Trash2,
-} from '@lucide/vue';
-import AssistantMessage from '@/components/AssistantMessage.vue';
-import AssistantAction from '@/components/AssistantAction.vue';
-import { i18n } from '@/lib/i18n';
-import AssistantThinking from '@/components/AssistantThinking.vue';
+} from "@lucide/vue";
+import AssistantMessage from "@/components/AssistantMessage.vue";
+import AssistantAction from "@/components/AssistantAction.vue";
+import { i18n } from "@/lib/i18n";
+import AssistantThinking from "@/components/AssistantThinking.vue";
 import {
     conversationScrollBehavior,
     parseAskReply,
     useAskConversation,
     type AskReply,
-} from '@/composables/useAskConversation';
+    type ChatMessage,
+} from "@/composables/useAskConversation";
 import {
     Dialog,
     DialogContent,
@@ -30,9 +31,9 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@/components/ui/dialog';
-import { ask } from '@/routes/ai';
-import { create as createInvoice } from '@/routes/invoices';
+} from "@/components/ui/dialog";
+import { ask } from "@/routes/ai";
+import { create as createInvoice } from "@/routes/invoices";
 
 type ErrorResponse = {
     message?: string;
@@ -41,51 +42,51 @@ type ErrorResponse = {
 
 const page = usePage();
 const firstName = computed(
-    () => page.props.auth.user.name.split(' ')[0] || 'there',
+    () => page.props.auth.user.name.split(" ")[0] || "there",
 );
 const suggestions = [
     {
         get tag() {
-            return t('ask.growth');
+            return t("ask.growth");
         },
         get text() {
-            return t('interface.how_can_i_attract_international_clients');
+            return t("interface.how_can_i_attract_international_clients");
         },
     },
     {
         get tag() {
-            return t('ask.writing');
+            return t("ask.writing");
         },
         get text() {
-            return t('interface.help_me_draft_a_professional_payment_reminder');
+            return t("interface.help_me_draft_a_professional_payment_reminder");
         },
     },
     {
         get tag() {
-            return t('ask.business');
+            return t("ask.business");
         },
         get text() {
-            return t('interface.how_many_customers_do_i_have');
+            return t("interface.how_many_customers_do_i_have");
         },
     },
     {
         get tag() {
-            return t('ask.currency');
+            return t("ask.currency");
         },
         get text() {
-            return t('interface.how_much_is_2_dollars_in_kenyan_shillings');
+            return t("interface.how_much_is_2_dollars_in_kenyan_shillings");
         },
     },
     {
         get tag() {
-            return t('ask.cashFlow');
+            return t("ask.cashFlow");
         },
         get text() {
-            return t('interface.which_invoices_have_an_outstanding_balance');
+            return t("interface.which_invoices_have_an_outstanding_balance");
         },
     },
 ];
-const input = ref('');
+const input = ref("");
 const composing = ref(false);
 const showClear = ref(false);
 const scroller = ref<HTMLElement | null>(null);
@@ -93,11 +94,120 @@ const composer = ref<HTMLTextAreaElement | null>(null);
 const {
     messages,
     busy,
+    loading,
+    conversationId,
     firstQuestion,
     send: sendQuestion,
     clear,
+    openConversation,
 } = useAskConversation(getAnswer, undefined, t);
 const hasConversation = computed(() => messages.value.length > 0);
+
+type SavedConversation = {
+    id: string;
+    title: string;
+    created_at: string;
+    updated_at: string;
+};
+
+type SavedMessage = {
+    id: number;
+    role: "user" | "assistant";
+    content: string;
+    metadata: Record<string, unknown> | null;
+};
+
+const conversations = ref<SavedConversation[]>([]);
+const historyError = ref("");
+const historyLoaded = ref(false);
+
+async function loadConversations() {
+    try {
+        const response = await fetch("/ai/conversations", {
+            credentials: "same-origin",
+            headers: {
+                Accept: "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error("Unable to load conversations.");
+        }
+
+        const data = await response.json();
+        conversations.value = data.conversations;
+        historyError.value = "";
+    } catch {
+        historyError.value = "Could not load conversation history.";
+    } finally {
+        historyLoaded.value = true;
+    }
+}
+
+async function selectConversation(id: string) {
+    if (busy.value || loading.value) return;
+
+    loading.value = true;
+    historyError.value = "";
+
+    try {
+        const response = await fetch(
+            `/ai/conversations/${encodeURIComponent(id)}`,
+            {
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                },
+            },
+        );
+
+        if (!response.ok) {
+            throw new Error("Unable to open conversation.");
+        }
+
+        const data = await response.json();
+
+        const savedMessages: ChatMessage[] = (
+            data.messages as SavedMessage[]
+        ).map((message) => {
+            const metadata = message.metadata ?? {};
+            const intent = metadata.intent;
+
+            const proposal =
+                metadata.proposal && typeof metadata.proposal === "object"
+                    ? (metadata.proposal as ChatMessage["proposal"])
+                    : undefined;
+
+            return {
+                id: message.id,
+                role: message.role,
+                text: message.content,
+                invoice: intent === "invoice",
+                ...(proposal ? { proposal } : {}),
+            };
+        });
+
+        loading.value = false;
+
+        if (openConversation(id, savedMessages)) {
+            input.value = "";
+            void toBottom();
+        }
+    } catch {
+        historyError.value = "Could not open this conversation.";
+    } finally {
+        loading.value = false;
+    }
+}
+
+onMounted(async () => {
+    await loadConversations();
+
+    // Open the most recently updated saved conversation.
+    if (conversations.value.length > 0 && !busy.value) {
+        await selectConversation(conversations.value[0].id);
+    }
+});
 
 async function getAnswer(
     question: string,
@@ -105,13 +215,13 @@ async function getAnswer(
 ): Promise<AskReply> {
     const cookie = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
     const response = await fetch(ask.url(), {
-        method: 'POST',
-        credentials: 'same-origin',
+        method: "POST",
+        credentials: "same-origin",
         headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': cookie ? decodeURIComponent(cookie[1]) : '',
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-XSRF-TOKEN": cookie ? decodeURIComponent(cookie[1]) : "",
         },
         body: JSON.stringify({
             question,
@@ -125,43 +235,43 @@ async function getAnswer(
     } catch {
         throw new Error(
             t(
-                'interface.the_server_returned_an_unreadable_response_please_try_again',
+                "interface.the_server_returned_an_unreadable_response_please_try_again",
             ),
         );
     }
     if (!response.ok) {
         if (response.status === 401) {
             throw new Error(
-                t('interface.you_are_signed_out_log_in_again_to_continue'),
+                t("interface.you_are_signed_out_log_in_again_to_continue"),
             );
         }
         if (response.status === 419) {
             throw new Error(
                 t(
-                    'interface.your_session_expired_refresh_the_page_and_try_again',
+                    "interface.your_session_expired_refresh_the_page_and_try_again",
                 ),
             );
         }
         if (response.status === 429) {
             throw new Error(
                 t(
-                    'interface.too_many_requests_please_wait_a_minute_and_try_again',
+                    "interface.too_many_requests_please_wait_a_minute_and_try_again",
                 ),
             );
         }
         const error =
-            payload && typeof payload === 'object'
+            payload && typeof payload === "object"
                 ? (payload as ErrorResponse)
                 : {};
         const validation = Object.values(error.errors ?? {})
             .flat()
-            .filter((value) => typeof value === 'string')
-            .join(' ');
+            .filter((value) => typeof value === "string")
+            .join(" ");
         throw new Error(
             validation ||
-                (typeof error.message === 'string'
+                (typeof error.message === "string"
                     ? error.message
-                    : t('errors.assistant')),
+                    : t("errors.assistant")),
         );
     }
     return parseAskReply(payload, t);
@@ -172,26 +282,32 @@ const toBottom = () =>
         scroller.value?.scrollTo({
             top: scroller.value.scrollHeight,
             behavior: conversationScrollBehavior(
-                window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+                window.matchMedia("(prefers-reduced-motion: reduce)").matches,
             ),
         });
     });
 
 async function send(text?: string) {
     const question = (text ?? input.value).trim();
-    if (!question || busy.value || composing.value) {
+
+    if (!question || busy.value || loading.value || composing.value) {
         return;
     }
+
     const request = sendQuestion(question);
-    input.value = '';
+
+    input.value = "";
     void toBottom();
+
     await request;
+    await loadConversations();
+
     void toBottom();
 }
 
 function handleComposerKeydown(event: KeyboardEvent) {
     if (
-        event.key === 'Enter' &&
+        event.key === "Enter" &&
         !event.shiftKey &&
         !event.isComposing &&
         !composing.value &&
@@ -204,11 +320,11 @@ function handleComposerKeydown(event: KeyboardEvent) {
 
 function newChat() {
     if (clear()) {
-        input.value = '';
+        input.value = "";
+        historyError.value = "";
         void nextTick(() => composer.value?.focus());
     }
 }
-
 function confirmClear() {
     newChat();
     showClear.value = false;
@@ -220,12 +336,12 @@ function confirmClear() {
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
                 <p class="mf-kicker mb-2">
-                    {{ t('interface.a_little_less_admin') }}
+                    {{ t("interface.a_little_less_admin") }}
                 </p>
                 <h1
                     class="font-display text-3xl font-semibold tracking-[-0.045em] sm:text-4xl"
                 >
-                    {{ t('ask.copilot') }}
+                    {{ t("ask.copilot") }}
                 </h1>
             </div>
             <span
@@ -233,7 +349,7 @@ function confirmClear() {
                 ><ShieldCheck
                     class="size-4 text-[#0f7d58] dark:text-[#8bdbb4]"
                     aria-hidden="true"
-                />{{ t('interface.your_records_your_workspace') }}</span
+                />{{ t("interface.your_records_your_workspace") }}</span
             >
         </div>
         <div
@@ -248,34 +364,67 @@ function confirmClear() {
                     :disabled="busy"
                     @click="newChat"
                 >
-                    <Plus class="size-4" aria-hidden="true" />{{ t('ask.new') }}
+                    <Plus class="size-4" aria-hidden="true" />{{ t("ask.new") }}
                 </button>
                 <div
                     class="mt-8 flex items-center gap-2 px-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase"
                 >
                     <History class="size-3.5" aria-hidden="true" />{{
-                        t('interface.this_workspace')
+                        t("interface.this_workspace")
                     }}
                 </div>
-                <template v-if="hasConversation">
+
+                <div class="mt-3 flex min-h-0 flex-col gap-1 overflow-y-auto">
                     <button
-                        class="mt-3 flex min-w-0 items-center gap-2 rounded-xl bg-secondary px-3 py-3 text-left text-xs font-medium break-words text-secondary-foreground"
-                        aria-current="true"
-                        @click="toBottom"
+                        v-for="conversation in conversations"
+                        :key="conversation.id"
+                        type="button"
+                        :disabled="busy || loading"
+                        :aria-current="
+                            conversation.id === conversationId
+                                ? 'true'
+                                : undefined
+                        "
+                        class="flex min-w-0 items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-medium transition hover:bg-secondary disabled:opacity-50"
+                        :class="
+                            conversation.id === conversationId
+                                ? 'bg-secondary text-secondary-foreground'
+                                : 'text-muted-foreground'
+                        "
+                        @click="selectConversation(conversation.id)"
                     >
-                        <span
-                            class="size-1.5 rounded-full bg-[#15966b]"
-                            aria-hidden="true"
-                        />{{ firstQuestion }}
+                        <History class="size-3.5 shrink-0" />
+                        <span class="truncate">
+                            {{ conversation.title }}
+                        </span>
                     </button>
-                </template>
+
+                    <p
+                        v-if="
+                            historyLoaded &&
+                            conversations.length === 0 &&
+                            !historyError
+                        "
+                        class="px-2 py-3 text-xs text-muted-foreground"
+                    >
+                        No saved conversations yet.
+                    </p>
+
+                    <p
+                        v-if="historyError"
+                        class="px-2 py-3 text-xs text-destructive"
+                    >
+                        {{ historyError }}
+                    </p>
+                </div>
+
                 <p
                     v-if="!hasConversation"
                     class="mt-3 px-2 text-xs leading-relaxed text-muted-foreground"
                 >
                     {{
                         t(
-                            'interface.your_current_conversation_will_appear_here',
+                            "interface.your_current_conversation_will_appear_here",
                         )
                     }}
                 </p>
@@ -288,14 +437,14 @@ function confirmClear() {
                             aria-hidden="true"
                         />
                         <p class="text-xs font-semibold">
-                            {{ t('interface.from_question_to_clarity') }}
+                            {{ t("interface.from_question_to_clarity") }}
                         </p>
                         <p
                             class="mt-2 text-xs leading-relaxed text-muted-foreground"
                         >
                             {{
                                 t(
-                                    'interface.explore_business_ideas_draft_messages_convert_currencies_or_ask_about_your_records_review_an_invoice_draft_before_you_confirm_it',
+                                    "interface.explore_business_ideas_draft_messages_convert_currencies_or_ask_about_your_records_review_an_invoice_draft_before_you_confirm_it",
                                 )
                             }}
                         </p>
@@ -306,7 +455,7 @@ function confirmClear() {
                         @click="showClear = true"
                     >
                         <Trash2 class="size-3.5" aria-hidden="true" />{{
-                            t('ask.clear')
+                            t("ask.clear")
                         }}
                     </button>
                 </div>
@@ -331,7 +480,7 @@ function confirmClear() {
                             <p class="mt-0.5 text-[11px] text-muted-foreground">
                                 {{
                                     t(
-                                        'interface.business_guidance_your_records_when_you_need_them',
+                                        "interface.business_guidance_your_records_when_you_need_them",
                                     )
                                 }}
                             </p>
@@ -344,7 +493,7 @@ function confirmClear() {
                             @click="newChat"
                         >
                             <Plus class="size-3.5" aria-hidden="true" />{{
-                                t('ask.newShort')
+                                t("ask.newShort")
                             }}</button
                         ><button
                             class="mf-button-secondary min-h-9 px-2.5"
@@ -376,15 +525,15 @@ function confirmClear() {
                                 aria-hidden="true"
                         /></span>
                         <p class="mf-kicker mb-3">
-                            {{ t('common.greeting', { name: firstName }) }}
+                            {{ t("common.greeting", { name: firstName }) }}
                         </p>
                         <h3
                             class="max-w-xl font-display text-[clamp(1.7rem,3vw,2.6rem)] leading-[1.1] font-semibold tracking-[-0.045em]"
                         >
-                            {{ t('interface.a_clearer_picture') }}<br /><span
+                            {{ t("interface.a_clearer_picture") }}<br /><span
                                 class="text-[#0f7d58] dark:text-[#8bdbb4]"
                                 >{{
-                                    t('interface.just_one_question_away')
+                                    t("interface.just_one_question_away")
                                 }}</span
                             >
                         </h3>
@@ -393,7 +542,7 @@ function confirmClear() {
                         >
                             {{
                                 t(
-                                    'interface.explore_a_new_idea_or_find_clarity_in_your_records_ask_a_question_in_your_own_words_then_keep_the_conversation_going',
+                                    "interface.explore_a_new_idea_or_find_clarity_in_your_records_ask_a_question_in_your_own_words_then_keep_the_conversation_going",
                                 )
                             }}
                         </p>
@@ -467,7 +616,7 @@ function confirmClear() {
                                         v-if="message.error"
                                         class="text-xs font-semibold text-destructive"
                                     >
-                                        {{ t('ask.error') }}
+                                        {{ t("ask.error") }}
                                     </p>
                                     <AssistantMessage :text="message.text" />
                                     <AssistantAction
@@ -485,7 +634,7 @@ function confirmClear() {
                                         ><FileText
                                             class="size-4"
                                             aria-hidden="true" />{{
-                                            t('ask.openInvoice')
+                                            t("ask.openInvoice")
                                         }}<ArrowRight
                                             class="size-4"
                                             aria-hidden="true"
@@ -513,7 +662,7 @@ function confirmClear() {
                         @submit.prevent="send()"
                     >
                         <label for="ask-question" class="sr-only">{{
-                            t('interface.your_question_for_mtaaflow')
+                            t("interface.your_question_for_mtaaflow")
                         }}</label
                         ><textarea
                             id="ask-question"
@@ -534,7 +683,7 @@ function confirmClear() {
                             :aria-label="t('ask.send')"
                         >
                             <span class="hidden sm:inline">{{
-                                t('ask.ask')
+                                t("ask.ask")
                             }}</span
                             ><ArrowUp class="size-4" aria-hidden="true" />
                         </button>
@@ -544,7 +693,7 @@ function confirmClear() {
                     >
                         {{
                             t(
-                                'interface.mtaaflow_can_make_mistakes_check_important_numbers_before_acting_on_them',
+                                "interface.mtaaflow_can_make_mistakes_check_important_numbers_before_acting_on_them",
                             )
                         }}
                     </p>
@@ -555,11 +704,11 @@ function confirmClear() {
             ><DialogContent
                 ><DialogHeader
                     ><DialogTitle class="font-display text-2xl">{{
-                        t('interface.make_room_for_a_fresh_start')
+                        t("interface.make_room_for_a_fresh_start")
                     }}</DialogTitle
                     ><DialogDescription class="leading-relaxed">{{
                         t(
-                            'interface.this_clears_the_messages_in_this_conversation_your_invoices_customers_and_stock_stay_in_your_account',
+                            "interface.this_clears_the_messages_in_this_conversation_your_invoices_customers_and_stock_stay_in_your_account",
                         )
                     }}</DialogDescription></DialogHeader
                 ><DialogFooter class="mt-3 gap-2"
@@ -567,13 +716,13 @@ function confirmClear() {
                         class="mf-button-secondary"
                         @click="showClear = false"
                     >
-                        {{ t('ask.keep') }}</button
+                        {{ t("ask.keep") }}</button
                     ><button
                         class="mf-button !bg-destructive !bg-none"
                         :disabled="busy"
                         @click="confirmClear"
                     >
-                        {{ t('ask.clear') }}
+                        {{ t("ask.clear") }}
                     </button></DialogFooter
                 ></DialogContent
             ></Dialog

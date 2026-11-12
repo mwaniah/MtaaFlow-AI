@@ -2,115 +2,201 @@
 
 namespace App\Actions\AI;
 
+use App\Models\AiConversation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class AskConversation
 {
-    private const string SessionKey = 'ask_mtaaflow';
-
     private const int MaximumMessages = 12;
-
-    private const int MaximumCharacters = 24000;
-
-    private const int MaximumConversations = 5;
 
     public function id(Request $request, ?string $requested): string
     {
-        $state = $this->state($request);
+        if ($requested !== null) {
+            $existing = \App\Models\AiConversation::query()
+                ->find($requested);
 
-        return $requested ?? ($state['active'] ?? (string) Str::uuid());
+            abort_if(
+                $existing && $existing->user_id !== $request->user()->id,
+                404
+            );
+
+            return $requested;
+        }
     }
 
-    /**
-     * @return list<array{role: string, content: string}>
-     */
     public function history(Request $request, string $conversationId): array
     {
-        return $this->state($request)['threads'][$conversationId]['messages'] ?? [];
+        $conversation = $request->user()
+            ->aiConversations()
+            ->find($conversationId);
+
+        if (!$conversation) {
+            return [];
+        }
+
+        return $conversation->messages()
+            ->orderByDesc('id')
+            ->limit(self::MaximumMessages)
+            ->get()
+            ->reverse()
+            ->map(fn($message) => [
+                'role' => $message->role,
+                'content' => Str::limit($message->content, 6000, ''),
+            ])
+            ->values()
+            ->all();
     }
 
-    /**
-     * @param  array<string, mixed>  $reply
-     * @return array<string, mixed>
-     */
-    public function complete(Request $request, string $conversationId, array $reply): array
-    {
-        $draft = $this->state($request)['threads'][$conversationId]['draft'] ?? null;
-        if (is_array($draft) && ($reply['intent'] ?? null) === 'action'
-            && ($draft['action'] ?? null) === ($reply['action'] ?? null)
-            && is_array($reply['action_data'] ?? null)) {
-            $reply['action_data'] = array_replace_recursive($draft['action_data'], array_filter($reply['action_data'], fn (mixed $value): bool => $value !== null));
+    public function complete(
+        Request $request,
+        string $conversationId,
+        array $reply
+    ): array {
+        $conversation = $request->user()
+            ->aiConversations()
+            ->find($conversationId);
+
+        if (!$conversation) {
+            return $reply;
+        }
+
+        $previous = $conversation->messages()
+            ->where('role', 'assistant')
+            ->orderByDesc('id')
+            ->first();
+
+        $draft = $previous?->metadata['draft'] ?? null;
+
+        if (
+            is_array($draft) &&
+            ($reply['intent'] ?? null) === 'action' &&
+            ($draft['action'] ?? null) === ($reply['action'] ?? null) &&
+            is_array($reply['action_data'] ?? null)
+        ) {
+            $reply['action_data'] = array_replace_recursive(
+                $draft['action_data'],
+                array_filter(
+                    $reply['action_data'],
+                    fn($value) => $value !== null
+                )
+            );
         }
 
         return $reply;
     }
 
-    /**
-     * @param  array<string, mixed>  $reply
-     */
-    public function remember(Request $request, string $conversationId, string $question, array $reply): void
-    {
-        $state = $this->state($request);
-        $messages = $state['threads'][$conversationId]['messages'] ?? [];
-        $messages[] = ['role' => 'user', 'content' => $this->contextText($question)];
-        $messages[] = ['role' => 'assistant', 'content' => $this->contextAnswer($reply)];
-        $messages = array_slice($messages, -self::MaximumMessages);
+    public function remember(
+        Request $request,
+        string $conversationId,
+        string $question,
+        array $reply
+    ): void {
+        $user = $request->user();
 
-        while (array_sum(array_map(fn (array $message): int => mb_strlen($message['content']), $messages)) > self::MaximumCharacters) {
-            $messages = array_slice($messages, 2);
+        $conversation = $user->aiConversations()
+            ->firstOrCreate(
+                ['id' => $conversationId],
+                [
+                    'title' => Str::limit(trim($question), 80),
+                ]
+            );
+
+        $conversation->messages()->create([
+            'role' => 'user',
+            'content' => $question,
+        ]);
+
+        $metadata = [
+            'intent' => $reply['intent'] ?? null,
+        ];
+
+        if (
+            in_array($reply['intent'] ?? null, ['invoice', 'action'], true)
+            && isset($reply['confirmation']['token'])
+        ) {
+            $metadata['proposal'] = [
+                'intent' => $reply['intent'],
+                'preview' => $reply['preview'] ?? $reply['draft'] ?? [],
+                'confirmation' => $reply['confirmation'],
+            ];
         }
 
-        unset($state['threads'][$conversationId]);
-        $state['threads'][$conversationId] = ['messages' => $messages, 'updated_at' => now()->timestamp];
-        if (($reply['intent'] ?? null) === 'action' && isset($reply['errors'], $reply['action_data'])) {
-            $state['threads'][$conversationId]['draft'] = array_intersect_key($reply, array_flip(['action', 'action_data']));
+        if (
+            ($reply['intent'] ?? null) === 'action' &&
+            isset($reply['errors'], $reply['action_data'])
+        ) {
+            $metadata['draft'] = [
+                'action' => $reply['action'] ?? null,
+                'action_data' => $reply['action_data'],
+            ];
         }
-        $state['active'] = $conversationId;
 
-        if (count($state['threads']) > self::MaximumConversations) {
-            $state['threads'] = array_slice($state['threads'], -self::MaximumConversations, null, true);
-        }
+        $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => $this->contextAnswer($reply),
+            'metadata' => $metadata,
+        ]);
 
-        $request->session()->put(self::SessionKey, $state);
+        $conversation->touch();
     }
 
-    /**
-     * @return array{user_id: int, active?: string, threads: array<string, array{messages: list<array{role: string, content: string}>, updated_at: int}>}
-     */
-    private function state(Request $request): array
+    public function index(Request $request)
     {
-        $state = $request->session()->get(self::SessionKey, []);
-        $userId = $request->user()->id;
-
-        if (($state['user_id'] ?? null) !== $userId) {
-            return ['user_id' => $userId, 'threads' => []];
-        }
-
-        $cutoff = now()->subMinutes(30)->timestamp;
-        $state['threads'] = array_filter($state['threads'], fn (array $thread): bool => $thread['updated_at'] >= $cutoff);
-
-        return $state;
+        return response()->json([
+            'conversations' => $request->user()
+                ->aiConversations()
+                ->orderByDesc('updated_at')
+                ->get(['id', 'title', 'created_at', 'updated_at']),
+        ]);
     }
 
-    /**
-     * @param  array<string, mixed>  $reply
-     */
+    public function show(Request $request, string $id)
+    {
+        $conversation = $request->user()
+            ->aiConversations()
+            ->findOrFail($id);
+
+        return response()->json([
+            'conversation' => $conversation,
+            'messages' => $conversation->messages()
+                ->orderBy('id')
+                ->get(['id', 'role', 'content', 'metadata', 'created_at']),
+        ]);
+    }
+
+    public function destroy(Request $request, string $id)
+    {
+        $conversation = $request->user()
+            ->aiConversations()
+            ->findOrFail($id);
+
+        $conversation->delete();
+
+        return response()->json([
+            'message' => 'Conversation deleted successfully.',
+        ]);
+    }
+
     private function contextAnswer(array $reply): string
     {
         return match ($reply['intent'] ?? null) {
-            'account_read' => 'Verified account records were retrieved for query '.($reply['query'] ?? 'summary').'. Re-query Laravel for current counts, names, amounts or dates; do not treat this as stored account facts.',
-            'invoice' => 'An invoice review was prepared. No invoice was created or approved by this chat response.',
-            'action' => 'An account action was proposed or needs clarification. No change was executed. '.json_encode(array_intersect_key($reply, array_flip(['action', 'action_data', 'preview', 'errors', 'answer'])), JSON_THROW_ON_ERROR),
-            'conversion' => isset($reply['earnings_context'])
-                ? 'An earnings conversion was requested with context '.json_encode($reply['earnings_context'], JSON_THROW_ON_ERROR).'. Re-query Laravel before further account conversions; no earnings amount is stored in this context.'
-                : 'A server-side conversion was answered. Re-query verified earnings before any further account conversion. '.$this->contextText($reply['answer'] ?? ''),
-            default => $this->contextText($reply['answer'] ?? ''),
-        };
-    }
+            'account_read' =>
+                'Verified account records were retrieved. '
+                . 'Re-query Laravel for current account information. '
+                . ($reply['answer'] ?? ''),
 
-    private function contextText(string $text): string
-    {
-        return Str::limit($text, 6000, '');
+            'invoice' =>
+                'An invoice review was prepared. '
+                . 'No invoice was created by this chat response. '
+                . ($reply['answer'] ?? ''),
+
+            'action' =>
+                'An account action was proposed or needs clarification. '
+                . 'No change was executed. '
+                . ($reply['answer'] ?? ''),
+
+            default => (string) ($reply['answer'] ?? ''),
+        };
     }
 }
