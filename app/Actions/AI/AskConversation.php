@@ -13,16 +13,18 @@ class AskConversation
     public function id(Request $request, ?string $requested): string
     {
         if ($requested !== null) {
-            $existing = \App\Models\AiConversation::query()
-                ->find($requested);
+            $existing = AiConversation::find($requested);
 
             abort_if(
-                $existing && $existing->user_id !== $request->user()->id,
+                $existing &&
+                (int) $existing->user_id !== (int) $request->user()->id,
                 404
             );
 
             return $requested;
         }
+
+        return (string) Str::uuid();
     }
 
     public function history(Request $request, string $conversationId): array
