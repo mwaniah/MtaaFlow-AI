@@ -39,7 +39,7 @@ class PayPalClient
     {
         try {
             $order = $this->send(
-                '/v2/checkout/orders/'.rawurlencode((string) $payment->paypal_order_id),
+                '/v2/checkout/orders/' . rawurlencode((string) $payment->paypal_order_id),
                 [],
                 (string) $payment->paypal_capture_request_id,
                 'GET'
@@ -64,7 +64,7 @@ class PayPalClient
      */
     public function approvalUrl(array $order): string
     {
-        $link = collect($order['links'] ?? [])->first(fn (mixed $link): bool => is_array($link)
+        $link = collect($order['links'] ?? [])->first(fn(mixed $link): bool => is_array($link)
             && in_array($link['rel'] ?? null, ['approve', 'payer-action'], true));
         $url = is_array($link) ? ($link['href'] ?? null) : null;
         $parts = is_string($url) ? parse_url($url) : false;
@@ -73,12 +73,14 @@ class PayPalClient
             : ['www.paypal.com', 'paypal.com'];
         parse_str(is_array($parts) ? ($parts['query'] ?? '') : '', $query);
 
-        if (! is_string($order['id'] ?? null) || $order['id'] === ''
-            || ! is_array($parts) || ($parts['scheme'] ?? null) !== 'https'
-            || ! in_array($parts['host'] ?? null, $hosts, true)
+        if (
+            !is_string($order['id'] ?? null) || $order['id'] === ''
+            || !is_array($parts) || ($parts['scheme'] ?? null) !== 'https'
+            || !in_array($parts['host'] ?? null, $hosts, true)
             || isset($parts['user']) || isset($parts['pass'])
             || (isset($parts['port']) && $parts['port'] !== 443)
-            || ($query['token'] ?? null) !== $order['id']) {
+            || ($query['token'] ?? null) !== $order['id']
+        ) {
             throw new PayPalGatewayException(
                 __('PayPal returned an incomplete checkout response. Retry with the same idempotency key.'),
                 502
@@ -100,15 +102,17 @@ class PayPalClient
 
         $payload = [
             'intent' => 'CAPTURE',
-            'purchase_units' => [[
-                'reference_id' => 'invoice-'.$invoice->id,
-                'custom_id' => 'payment-'.$payment->id,
-                'description' => 'Invoice '.$invoice->invoice_number,
-                'amount' => [
-                    'currency_code' => $invoice->currency,
-                    'value' => $amount,
-                ],
-            ]],
+            'purchase_units' => [
+                [
+                    'reference_id' => 'invoice-' . $invoice->id,
+                    'custom_id' => 'payment-' . $payment->id,
+                    'description' => 'Invoice ' . $invoice->invoice_number,
+                    'amount' => [
+                        'currency_code' => $invoice->currency,
+                        'value' => $amount,
+                    ],
+                ]
+            ],
             'application_context' => [
                 'user_action' => 'PAY_NOW',
             ],
@@ -116,11 +120,15 @@ class PayPalClient
 
         if ($returnUrl !== null && $cancelUrl !== null) {
             unset($payload['application_context']);
-            $payload['payment_source'] = ['paypal' => ['experience_context' => [
-                'user_action' => 'PAY_NOW',
-                'return_url' => $returnUrl,
-                'cancel_url' => $cancelUrl,
-            ]]];
+            $payload['payment_source'] = [
+                'paypal' => [
+                    'experience_context' => [
+                        'user_action' => 'PAY_NOW',
+                        'return_url' => $returnUrl,
+                        'cancel_url' => $cancelUrl,
+                    ]
+                ]
+            ];
         }
 
         return $this->send('/v2/checkout/orders', $payload, $payment->idempotency_key);
@@ -133,7 +141,7 @@ class PayPalClient
     {
         try {
             $response = $this->send(
-                '/v2/checkout/orders/'.rawurlencode((string) $payment->paypal_order_id).'/capture',
+                '/v2/checkout/orders/' . rawurlencode((string) $payment->paypal_order_id) . '/capture',
                 [],
                 (string) $payment->paypal_capture_request_id
             );
@@ -149,15 +157,19 @@ class PayPalClient
         }
         $purchaseUnit = $response['purchase_units'][0] ?? [];
 
-        if (($response['status'] ?? null) === 'COMPLETED'
-            && (! isset($purchaseUnit['custom_id']) || ! isset($purchaseUnit['amount']))) {
+        if (
+            ($response['status'] ?? null) === 'COMPLETED'
+            && (!isset($purchaseUnit['custom_id']) || !isset($purchaseUnit['amount']))
+        ) {
             $details = $this->getOrder($payment) ?? [];
             $captureId = $this->verifyCapture($details, $payment, $payment->invoice);
             $responseCaptureId = $purchaseUnit['payments']['captures'][0]['id'] ?? null;
 
-            if (($details['id'] ?? null) !== $payment->paypal_order_id
+            if (
+                ($details['id'] ?? null) !== $payment->paypal_order_id
                 || (isset($response['id']) && $response['id'] !== $payment->paypal_order_id)
-                || ($responseCaptureId !== null && $responseCaptureId !== $captureId)) {
+                || ($responseCaptureId !== null && $responseCaptureId !== $captureId)
+            ) {
                 throw new PayPalGatewayException(__('PayPal could not verify the captured payment.'), 502);
             }
 
@@ -185,19 +197,19 @@ class PayPalClient
         if (
             ($response['status'] ?? null) !== 'COMPLETED'
             || ($response['id'] ?? null) !== $payment->paypal_order_id
-            || ! is_array($response['purchase_units'] ?? null)
+            || !is_array($response['purchase_units'] ?? null)
             || count($response['purchase_units'] ?? []) !== 1
-            || ! is_array($purchaseUnit)
-            || ($purchaseUnit['reference_id'] ?? null) !== 'invoice-'.$invoice->id
-            || ($purchaseUnit['custom_id'] ?? null) !== 'payment-'.$payment->id
-            || ! is_array($capture)
+            || !is_array($purchaseUnit)
+            || ($purchaseUnit['reference_id'] ?? null) !== 'invoice-' . $invoice->id
+            || ($purchaseUnit['custom_id'] ?? null) !== 'payment-' . $payment->id
+            || !is_array($capture)
             || count($purchaseUnit['payments']['captures'] ?? []) !== 1
             || ($capture['status'] ?? null) !== 'COMPLETED'
-            || ! is_string($capture['id'] ?? null)
+            || !is_string($capture['id'] ?? null)
             || $capture['id'] === ''
             || $payment->currency !== $invoice->currency
-            || ! $this->amountMatches($purchaseUnit['amount'] ?? null, $payment, $invoice)
-            || ! $this->amountMatches($capture['amount'] ?? null, $payment, $invoice)
+            || !$this->amountMatches($purchaseUnit['amount'] ?? null, $payment, $invoice)
+            || !$this->amountMatches($capture['amount'] ?? null, $payment, $invoice)
         ) {
             throw new PayPalGatewayException(__('PayPal could not verify the captured payment.'), 502);
         }
@@ -208,9 +220,9 @@ class PayPalClient
     private function amountMatches(mixed $amount, Payment $payment, Invoice $invoice): bool
     {
         if (
-            ! is_array($amount)
+            !is_array($amount)
             || ($amount['currency_code'] ?? null) !== $invoice->currency
-            || ! is_string($amount['value'] ?? null)
+            || !is_string($amount['value'] ?? null)
         ) {
             return false;
         }
@@ -239,8 +251,10 @@ class PayPalClient
                 ->withHeaders(['PayPal-Request-Id' => $requestId, 'Prefer' => 'return=representation'])
                 ->send(
                     $method,
-                    rtrim((string) config('services.paypal.base_url'), '/').$path,
-                    $method === 'GET' ? [] : ['json' => $payload]
+                    rtrim((string) config('services.paypal.base_url'), '/') . $path,
+                    $method === 'GET'
+                    ? []
+                    : ['json' => $payload === [] ? new \stdClass() : $payload]
                 );
         } catch (ConnectionException $exception) {
             throw new PayPalGatewayException(
@@ -259,7 +273,9 @@ class PayPalClient
             $httpStatus = $status >= 400 && $status < 500 && $status !== 429 ? 422 : 502;
 
             throw new PayPalGatewayException(
-                $message, $httpStatus, providerStatus: $status,
+                $message,
+                $httpStatus,
+                providerStatus: $status,
                 providerIssue: is_string($issue) ? $issue : null,
                 debugId: $response->header('PayPal-Debug-Id')
             );
@@ -267,7 +283,7 @@ class PayPalClient
 
         $data = $response->json();
 
-        if (! is_array($data)) {
+        if (!is_array($data)) {
             throw new PayPalGatewayException(__('PayPal returned an invalid response.'), 502);
         }
 
@@ -276,13 +292,13 @@ class PayPalClient
 
     private function accessToken(): string
     {
-        if (! $this->isConfigured()) {
+        if (!$this->isConfigured()) {
             throw new PayPalGatewayException(__('PayPal Sandbox credentials are not configured.'), 503);
         }
 
         $clientId = (string) config('services.paypal.client_id');
         $clientSecret = (string) config('services.paypal.client_secret');
-        $cacheKey = 'paypal.oauth.'.hash('sha256', config('services.paypal.base_url').'|'.$clientId.'|'.$clientSecret);
+        $cacheKey = 'paypal.oauth.' . hash('sha256', config('services.paypal.base_url') . '|' . $clientId . '|' . $clientSecret);
         $cachedToken = Cache::get($cacheKey);
 
         if (is_string($cachedToken) && $cachedToken !== '') {
@@ -295,7 +311,7 @@ class PayPalClient
                 ->acceptJson()
                 ->withBasicAuth($clientId, $clientSecret)
                 ->asForm()
-                ->post(rtrim((string) config('services.paypal.base_url'), '/').'/v1/oauth2/token', [
+                ->post(rtrim((string) config('services.paypal.base_url'), '/') . '/v1/oauth2/token', [
                     'grant_type' => 'client_credentials',
                 ]);
         } catch (ConnectionException $exception) {
@@ -311,7 +327,7 @@ class PayPalClient
         $accessToken = is_array($data) ? ($data['access_token'] ?? null) : null;
         $expiresIn = is_array($data) ? (int) ($data['expires_in'] ?? 0) : 0;
 
-        if (! is_string($accessToken) || $accessToken === '' || $expiresIn < 2) {
+        if (!is_string($accessToken) || $accessToken === '' || $expiresIn < 2) {
             throw new PayPalGatewayException(__('PayPal returned an incomplete authentication response.'), 502);
         }
 

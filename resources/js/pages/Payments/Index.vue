@@ -278,10 +278,21 @@ function exportCell(p: ProcessCellForExportParams): string {
     return /^[=+\-@]/.test(v) ? `'${v}` : v;
 }
 
-const latestFailed = computed(() =>
-    rows.value.find((r) => r.group === 'failed'),
-);
+const latestFailed = computed(() => {
+    return rows.value.find((payment) => {
+        if (payment.group !== 'failed') return false;
 
+        const successfulPayment = rows.value.some(
+            (other) =>
+                other.invoice_id === payment.invoice_id &&
+                other.group === 'successful' &&
+                new Date(other.paid_at ?? other.created_at ?? 0).getTime() >
+                    new Date(payment.created_at ?? 0).getTime(),
+        );
+
+        return !successfulPayment;
+    });
+});
 // While a payment is pending, ask Laravel again every 5 seconds (at most 12 times). Laravel only changes a status after PayPal verifies it.
 const hasPending = computed(() =>
     rows.value.some((r) => r.group === 'pending'),
