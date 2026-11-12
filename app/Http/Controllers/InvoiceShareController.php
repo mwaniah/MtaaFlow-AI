@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Invoices\InvoiceBalance;
+use App\Actions\Invoices\ResolveInvoiceShare;
+use App\Actions\Payments\PayPalClient;
 use App\Currency;
 use App\Mail\SharedInvoiceMail;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoiceShare;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 class InvoiceShareController extends Controller
 {
@@ -83,7 +87,7 @@ class InvoiceShareController extends Controller
 
         if (! is_string($invoice->customer->email) || $invoice->customer->email === '') {
             return response()->json([
-                'message' => 'The customer does not have an email address on file.',
+                'message' => __('The customer does not have an email address on file.'),
             ], 422);
         }
 
@@ -105,50 +109,32 @@ class InvoiceShareController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Invoice link email sent.',
+            'message' => __('Invoice link email sent.'),
             'delivery_status' => 'sent',
             'emailed_at' => $share->emailed_at,
         ]);
     }
 
-    public function show(string $token): JsonResponse
-    {
-        $share = InvoiceShare::query()
-            ->where('token_hash', hash('sha256', $token))
-            ->whereNull('revoked_at')
-            ->where(fn (Builder $query) => $query
-                ->whereNull('expires_at')
-                ->orWhere('expires_at', '>', now()))
-            ->with([
-                'invoice.customer',
-                'invoice.items',
-                'invoice.payments' => fn (HasMany $query) => $query->where('status', 'completed'),
-            ])
-            ->firstOrFail();
-        $invoice = $share->invoice;
-
-        abort_unless($invoice->customer?->user_id === $invoice->user_id, 404);
-
-        $totalMinor = Currency::minor((string) $invoice->total, $invoice->currency);
-        $paidMinor = 0;
-
-        foreach ($invoice->payments as $payment) {
-            if ($payment->currency !== $invoice->currency) {
-                continue;
-            }
-
-            $amountMinor = Currency::minor((string) $payment->amount, $invoice->currency);
-
-            if ($amountMinor > PHP_INT_MAX - $paidMinor) {
-                throw new \OverflowException('The payment total exceeds the supported range.');
-            }
-
-            $paidMinor += $amountMinor;
-        }
-
+    public function show(
+        Request $request,
+        string $token,
+        ResolveInvoiceShare $shares,
+        PayPalClient $paypal,
+        InvoiceBalance $balance
+    ): Response {
+        $invoice = $shares->handle($token)->invoice->load('items');
+        $totalMinor = $balance->totalMinor($invoice);
+        $paidMinor = $balance->paidMinor($invoice);
         $balanceMinor = max(0, $totalMinor - $paidMinor);
+        [$reasonCode, $reason] = match (true) {
+            $balanceMinor === 0 => ['paid', __('This invoice has been paid in full.')],
+            $invoice->status !== 'approved' => ['unavailable', __('This invoice is not available for payment.')],
+            ! in_array($invoice->currency, config('services.paypal.supported_currencies', []), true) => ['currency', __('PayPal does not support this invoice currency.')],
+            ! $paypal->isConfigured() => ['configuration', __('PayPal checkout is currently unavailable.')],
+            default => [null, null],
+        };
 
-        return response()->json([
+        $data = [
             'invoice' => [
                 'invoice_number' => $invoice->invoice_number,
                 'customer_name' => $invoice->customer->name,
@@ -174,8 +160,25 @@ class InvoiceShareController extends Controller
                 'total' => Currency::format($totalMinor, $invoice->currency),
                 'payments_received' => Currency::format($paidMinor, $invoice->currency),
                 'remaining_balance' => Currency::format($balanceMinor, $invoice->currency),
-                'status' => $balanceMinor === 0 ? 'paid' : 'approved',
+                'status' => in_array($invoice->status, ['approved', 'paid'], true) && $balanceMinor === 0
+                    ? 'paid'
+                    : $invoice->status,
             ],
-        ]);
+            'checkout' => [
+                'available' => $reason === null,
+                'reason' => $reason,
+                'reason_code' => $reasonCode,
+                'mode' => config('services.paypal.mode', 'sandbox'),
+                'order_id' => $invoice->payments()->where('status', 'pending')->whereNotNull('paypal_order_id')->value('paypal_order_id'),
+            ],
+        ];
+
+        $response = $request->expectsJson()
+            ? response()->json($data)
+            : Inertia::render('Invoices/Public', [...$data, 'token' => $token])->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+
+        return $response;
     }
 }

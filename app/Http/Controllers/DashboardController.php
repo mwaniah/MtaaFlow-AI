@@ -24,6 +24,7 @@ class DashboardController extends Controller
             ->whereRaw('total > COALESCE((SELECT SUM(amount) FROM payments WHERE payments.invoice_id = invoices.id AND payments.status = ? AND payments.currency = invoices.currency), 0)', ['completed']);
 
         return Inertia::render('Dashboard', [
+            'invoicedTotalsByCurrency' => $user->invoices()->select('currency')->selectRaw('SUM(total) as total')->groupBy('currency')->orderBy('currency')->get(),
             'totalCustomers' => $user->customers()->count(),
             'totalInvoices' => $user->invoices()->count(),
             'paidInvoiceCount' => $user->invoices()->where('status', 'paid')->count(),

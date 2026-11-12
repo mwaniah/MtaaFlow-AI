@@ -18,7 +18,7 @@ class InvoiceController extends Controller
         return Inertia::render('Invoices/Index', [
             'invoices' => $request->user()
                 ->invoices()
-                ->with('customer')
+                ->with(['customer', 'payments'])
                 ->latest()
                 ->get(),
         ]);
@@ -44,7 +44,7 @@ class InvoiceController extends Controller
 
         return redirect()
             ->route('invoices.index')
-            ->with('success', 'Invoice created successfully.');
+            ->with('success', __('Invoice created successfully.'));
     }
 
     // View one invoice and its related records
@@ -92,7 +92,7 @@ class InvoiceController extends Controller
 
         return redirect()
             ->route('invoices.index')
-            ->with('success', 'Invoice updated successfully.');
+            ->with('success', __('Invoice updated successfully.'));
     }
 
     // Delete an invoice only if it is still a draft
@@ -112,7 +112,7 @@ class InvoiceController extends Controller
 
             if ($invoice->payments()->exists()) {
                 throw ValidationException::withMessages([
-                    'invoice' => 'An invoice with payment records cannot be deleted.',
+                    'invoice' => __('An invoice with payment records cannot be deleted.'),
                 ]);
             }
 
@@ -123,38 +123,21 @@ class InvoiceController extends Controller
 
         return redirect()
             ->route('invoices.index')
-            ->with('success', 'Invoice deleted successfully.');
+            ->with('success', __('Invoice deleted successfully.'));
     }
 
     // Approve an invoice after review
-    public function approve(Request $request, $id)
+    public function approve(Request $request, $id, InvoiceWriter $writer)
     {
         $invoice = $request->user()
             ->invoices()
             ->findOrFail($id);
 
-        DB::transaction(function () use ($invoice) {
-            $invoice = $invoice->newQuery()
-                ->whereKey($invoice->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            $this->ensureDraft($invoice);
-
-            if (! $invoice->items()->exists()) {
-                throw ValidationException::withMessages([
-                    'invoice' => 'An invoice must have at least one item.',
-                ]);
-            }
-
-            $invoice->update([
-                'status' => 'approved',
-            ]);
-        });
+        $writer->approve($invoice);
 
         return redirect()
             ->route('invoices.show', $invoice->id)
-            ->with('success', 'Invoice approved successfully.');
+            ->with('success', __('Invoice approved successfully.'));
     }
 
     // Prevent editing, deleting or reapproving non-draft invoices
@@ -162,7 +145,7 @@ class InvoiceController extends Controller
     {
         if ($invoice->status !== 'draft') {
             throw ValidationException::withMessages([
-                'invoice' => 'Only draft invoices can be modified.',
+                'invoice' => __('Only draft invoices can be modified.'),
             ]);
         }
     }

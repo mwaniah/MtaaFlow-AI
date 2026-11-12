@@ -4,8 +4,12 @@ namespace App\Actions\AI;
 
 use App\Actions\Inventory\StockAdjuster;
 use App\Actions\Invoices\InvoiceBalance;
+use App\Actions\Invoices\InvoiceWriter;
+use App\Concerns\CustomerValidationRules;
 use App\Currency;
+use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Payment;
 use App\Models\PaymentReminder;
 use App\Models\Product;
@@ -18,6 +22,10 @@ use Illuminate\Validation\ValidationException;
 
 class AccountOperations
 {
+    use CustomerValidationRules;
+
+    public function __construct(private InvoiceWriter $invoices) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -32,7 +40,7 @@ class AccountOperations
             'reminders' => $this->reminders($user),
             'summary' => $this->summary($user),
             default => throw ValidationException::withMessages([
-                'query' => 'This account query is not supported.',
+                'query' => __('This account query is not supported.'),
             ]),
         };
     }
@@ -47,13 +55,32 @@ class AccountOperations
         array $data,
         InvoiceBalance $balance,
     ): array {
+        if ($operation === 'product.create') {
+            $this->rejectProductPrices($data);
+        } elseif ($operation === 'product.update' && is_array($data['changes'] ?? null)) {
+            $this->rejectProductPrices($data['changes']);
+        }
+
+        $this->ensureSupportedFields($data, match ($operation) {
+            'customer.create' => ['name', 'email', 'phone', 'address'],
+            'customer.update', 'customer.delete' => ['customer_id', 'customer_name', 'changes'],
+            'product.create' => ['name', 'sku', 'description', 'quantity', 'low_stock_threshold'],
+            'product.update' => ['product_id', 'product_name', 'changes'],
+            'inventory.adjust' => ['product_id', 'product_name', 'quantity_change', 'notes'],
+            'invoice.update', 'invoice.approve' => ['invoice_id', 'invoice_number', 'changes'],
+            'reminder.create' => ['invoice_number', 'message'],
+            default => [],
+        });
+
         return match ($operation) {
             'customer.create' => $this->prepareCustomer($data),
+            'customer.update', 'customer.delete', 'product.update' => $this->prepareRecordChange($user, $operation, $data),
+            'invoice.update', 'invoice.approve' => $this->prepareInvoiceChange($user, $operation, $data),
             'product.create' => $this->prepareProduct($user, $data),
             'inventory.adjust' => $this->prepareInventoryAdjustment($user, $data),
             'reminder.create' => $this->prepareReminder($user, $data, $balance),
             default => throw ValidationException::withMessages([
-                'action' => 'This account action is not supported.',
+                'action' => __('This account action is not supported.'),
             ]),
         };
     }
@@ -71,11 +98,13 @@ class AccountOperations
     ): array {
         return match ($operation) {
             'customer.create' => $this->createCustomer($user, $payload),
+            'customer.update', 'customer.delete', 'product.update' => $this->changeRecord($user, $operation, $payload),
+            'invoice.update', 'invoice.approve' => $this->changeInvoice($user, $operation, $payload),
             'product.create' => $this->createProduct($user, $payload, $stockAdjuster),
             'inventory.adjust' => $this->adjustInventory($user, $payload, $stockAdjuster),
             'reminder.create' => $this->createReminder($user, $payload, $balance),
             default => throw ValidationException::withMessages([
-                'action' => 'This account action is no longer supported.',
+                'action' => __('This account action is no longer supported.'),
             ]),
         };
     }
@@ -204,7 +233,7 @@ class AccountOperations
     {
         $totals = Payment::query()
             ->where('status', 'completed')
-            ->whereHas('invoice', fn (Builder $query) => $query->where('user_id', $user->id))
+            ->whereHas('invoice', fn (Builder $query) => $query->where('user_id', $user->id)->whereColumn('invoices.currency', 'payments.currency'))
             ->select('currency')
             ->selectRaw('SUM(amount) as total')
             ->groupBy('currency')
@@ -256,6 +285,9 @@ class AccountOperations
     {
         return [
             'query' => 'summary',
+            'total_invoices' => $user->invoices()->count(),
+            'paid_invoices' => $user->invoices()->where('status', 'paid')->count(),
+            'totals_by_currency' => $this->revenue($user)['totals_by_currency'],
             'customers' => $user->customers()->count(),
             'products' => $user->products()->count(),
             'low_stock_products' => $user->products()
@@ -272,14 +304,276 @@ class AccountOperations
      * @param  array<string, mixed>  $data
      * @return array{payload: array<string, mixed>, preview: array<string, mixed>}
      */
-    private function prepareCustomer(array $data): array
+    private function prepareRecordChange(User $user, string $operation, array $data): array
+    {
+        $kind = str_starts_with($operation, 'customer.') ? 'customer' : 'product';
+        $validated = Validator::make($data, [
+            $kind.'_id' => ['nullable', 'integer', 'min:1'],
+            $kind.'_name' => ['required_without:'.$kind.'_id', 'nullable', 'string', 'max:255'],
+            'changes' => [$operation === 'customer.delete' ? 'nullable' : 'required', 'array'],
+        ])->validate();
+        $record = $this->resolveRecord($user, $kind, $validated);
+        if ($operation === 'customer.delete' && $record->invoices()->exists()) {
+            throw ValidationException::withMessages(['customer' => __('Cannot delete a customer who has invoices.')]);
+        }
+
+        $changes = $operation === 'customer.delete'
+            ? []
+            : $this->validateRecordChanges($user, $record, $validated['changes']);
+
+        return ['payload' => [$kind.'_id' => $record->id, 'changes' => $changes], 'preview' => ['operation' => $operation, 'name' => $record->name, 'changes' => $changes]];
+    }
+
+    /**
+     * @param  array<string, mixed>  $changes
+     * @return array<string, mixed>
+     */
+    private function validateRecordChanges(User $user, Customer|Product $record, array $changes): array
+    {
+        if ($record instanceof Product) {
+            $this->rejectProductPrices($changes);
+        }
+
+        $rules = $record instanceof Customer ? $this->customerRules($record) : [
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'sku' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('products', 'sku')->where('user_id', $user->id)->ignore($record->id)],
+            'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'low_stock_threshold' => ['sometimes', 'required', 'integer', 'min:0', 'max:2147483647'],
+        ];
+
+        $this->ensureSupportedFields($changes, array_keys($rules));
+
+        return Validator::make($changes, $rules)->validate();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function changeRecord(User $user, string $operation, array $payload): array
+    {
+        $kind = str_starts_with($operation, 'customer.') ? 'customer' : 'product';
+        $query = $kind === 'customer' ? $user->customers() : $user->products();
+        $record = $query->whereKey($payload[$kind.'_id'])->lockForUpdate()->firstOrFail();
+
+        if ($operation === 'customer.delete') {
+            if ($record->invoices()->exists()) {
+                throw ValidationException::withMessages(['customer' => __('Cannot delete a customer who has invoices.')]);
+            }
+            $record->delete();
+
+            return ['deleted' => true, 'name' => $record->name];
+        }
+
+        $record->update($this->validateRecordChanges($user, $record, $payload['changes']));
+
+        return [$kind => ['id' => $record->id, 'name' => $record->name]];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function resolveRecord(User $user, string $kind, array $data): Customer|Product|Invoice
+    {
+        $nameField = $kind === 'invoice' ? 'invoice_number' : $kind.'_name';
+        $column = $kind === 'invoice' ? 'invoice_number' : 'name';
+        $query = match ($kind) {
+            'customer' => $user->customers(),
+            'product' => $user->products(),
+            'invoice' => $user->invoices()->with('customer'),
+        };
+
+        if (isset($data[$kind.'_id'])) {
+            $query->whereKey($data[$kind.'_id']);
+        }
+        if (isset($data[$nameField])) {
+            $query->whereRaw('LOWER('.$column.') = ?', [mb_strtolower(trim($data[$nameField]))]);
+        }
+
+        $records = $query->orderBy('id')->limit(10)->get();
+
+        if ($records->count() !== 1) {
+            throw ValidationException::withMessages([
+                isset($data[$kind.'_id']) ? $kind.'_id' : $nameField => $records->isEmpty()
+                    ? ($kind === 'product' && ! isset($data['product_id']) ? __('No product with that name exists in this account.') : __('No matching record exists in your account.'))
+                    : __('Choose a record by ID: ').$records->map(fn ($record): string => $record->id.': '.$record->{$column})->implode('; '),
+            ]);
+        }
+
+        $record = $records->first();
+
+        if ($record instanceof Invoice && $record->customer?->user_id !== $user->id) {
+            throw ValidationException::withMessages(['invoice_id' => __('No matching record exists in your account.')]);
+        }
+
+        return $record;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{payload: array<string, mixed>, preview: array<string, mixed>}
+     */
+    private function prepareInvoiceChange(User $user, string $operation, array $data): array
     {
         $validated = Validator::make($data, [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'address' => ['nullable', 'string', 'max:5000'],
+            'invoice_id' => ['nullable', 'integer', 'min:1'],
+            'invoice_number' => ['required_without:invoice_id', 'nullable', 'string', 'max:255'],
+            'changes' => [$operation === 'invoice.approve' ? 'prohibited' : 'required', 'array', 'min:1'],
         ])->validate();
+        $invoice = $this->resolveRecord($user, 'invoice', $validated)->load('items');
+        $this->ensureDraftInvoice($invoice);
+        $payload = ['invoice_id' => $invoice->id, 'snapshot' => $this->invoiceSnapshot($invoice)];
+        $draft = $this->invoiceDraft($invoice);
+
+        if ($operation === 'invoice.approve') {
+            if ($invoice->items->isEmpty()) {
+                throw ValidationException::withMessages(['invoice' => __('An invoice must have at least one item.')]);
+            }
+        } else {
+            $changes = $validated['changes'];
+            $this->ensureSupportedFields($changes, ['customer_id', 'customer_name', 'currency', 'issue_date', 'due_date', 'items', 'append_items']);
+
+            if (array_key_exists('items', $changes) && array_key_exists('append_items', $changes)) {
+                throw ValidationException::withMessages(['items' => __('Provide replacement items or appended items, not both.')]);
+            }
+
+            if (isset($changes['customer_id']) || isset($changes['customer_name'])) {
+                $selectors = Validator::make($changes, [
+                    'customer_id' => ['nullable', 'integer', 'min:1'],
+                    'customer_name' => ['nullable', 'string', 'max:255'],
+                ])->validate();
+                $changes['customer_id'] = $this->resolveRecord($user, 'customer', $selectors)->id;
+                unset($changes['customer_name']);
+            }
+
+            if (array_key_exists('append_items', $changes)) {
+                Validator::make($changes, ['append_items' => ['required', 'array', 'min:1', 'max:100']])->validate();
+                $changes['items'] = [...$draft['items'], ...$changes['append_items']];
+                unset($changes['append_items']);
+            }
+
+            $draft = $this->invoices->validate($user, array_replace($draft, $changes));
+            $payload['draft'] = $draft;
+        }
+
+        return [
+            'payload' => $payload,
+            'preview' => [
+                'operation' => $operation,
+                'invoice' => [
+                    'id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    ...$draft,
+                    'total' => Currency::format($this->invoices->totalMinor($draft), $draft['currency']),
+                    'status' => $operation === 'invoice.approve' ? 'approved' : 'draft',
+                    'url' => route('invoices.show', $invoice),
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function changeInvoice(User $user, string $operation, array $payload): array
+    {
+        $validated = Validator::make($payload, [
+            'invoice_id' => ['required', 'integer', 'min:1'],
+            'snapshot' => ['required', 'string', 'size:64'],
+            'draft' => [$operation === 'invoice.update' ? 'required' : 'prohibited', 'array'],
+        ])->validate();
+        $invoice = $user->invoices()->with(['items', 'customer'])->whereKey($validated['invoice_id'])->lockForUpdate()->firstOrFail();
+        $this->ensureDraftInvoice($invoice);
+
+        if ($invoice->customer?->user_id !== $user->id) {
+            abort(404);
+        }
+        if (! hash_equals($validated['snapshot'], $this->invoiceSnapshot($invoice))) {
+            throw ValidationException::withMessages(['invoice' => __('The invoice changed after this preview. Please request a new preview.')]);
+        }
+
+        if ($operation === 'invoice.approve') {
+            $this->invoices->approve($invoice);
+        } else {
+            $this->invoices->updateDraft($invoice, $this->invoices->validate($user, $validated['draft']));
+        }
+
+        $invoice->refresh();
+
+        return ['invoice' => [
+            'id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'status' => $invoice->status,
+            'currency' => $invoice->currency,
+            'total' => Currency::format(Currency::minor((string) $invoice->total, $invoice->currency), $invoice->currency),
+            'url' => route('invoices.show', $invoice),
+        ]];
+    }
+
+    private function ensureDraftInvoice(Invoice $invoice): void
+    {
+        if ($invoice->status !== 'draft') {
+            throw ValidationException::withMessages(['invoice' => __('Only draft invoices can be modified.')]);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function invoiceDraft(Invoice $invoice): array
+    {
+        return [
+            'customer_id' => $invoice->customer_id,
+            'currency' => $invoice->currency,
+            'issue_date' => $invoice->issue_date?->toDateString(),
+            'due_date' => $invoice->due_date?->toDateString(),
+            'items' => $invoice->items->sortBy('id')->map(fn (InvoiceItem $item): array => [
+                'description' => $item->description,
+                'quantity' => (int) $item->quantity,
+                'unit_price' => Currency::format(Currency::minor((string) $item->unit_price, $invoice->currency), $invoice->currency),
+            ])->values()->all(),
+        ];
+    }
+
+    private function invoiceSnapshot(Invoice $invoice): string
+    {
+        return hash('sha256', json_encode([
+            ...$this->invoiceDraft($invoice),
+            'status' => $invoice->status,
+            'total' => (string) $invoice->total,
+            'items_ids' => $invoice->items->sortBy('id')->pluck('id')->values()->all(),
+        ], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function rejectProductPrices(array $data): void
+    {
+        if (array_intersect(['price', 'selling_price', 'unit_price', 'currency'], array_keys($data)) !== []) {
+            throw ValidationException::withMessages(['price' => __('Inventory products do not store selling prices or currencies. Use invoice item prices instead.')]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $supported
+     */
+    private function ensureSupportedFields(array $data, array $supported): void
+    {
+        if (array_diff(array_keys($data), $supported) !== []) {
+            throw ValidationException::withMessages(['changes' => __('This account action is not supported.')]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{payload: array<string, mixed>, preview: array<string, mixed>}
+     */
+    private function prepareCustomer(array $data): array
+    {
+        $validated = Validator::make($data, $this->customerRules())->validate();
         $validated['name'] = trim($validated['name']);
 
         return [
@@ -312,31 +606,19 @@ class AccountOperations
     private function prepareInventoryAdjustment(User $user, array $data): array
     {
         $validated = Validator::make($data, [
-            'product_name' => ['required', 'string', 'max:255'],
+            'product_id' => ['nullable', 'integer', 'min:1'],
+            'product_name' => ['required_without:product_id', 'nullable', 'string', 'max:255'],
             'quantity_change' => ['required', 'integer', 'between:-2147483647,2147483647', 'not_in:0'],
             'notes' => ['nullable', 'string', 'max:500'],
         ])->validate();
-        $products = $user->products()
-            ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($validated['product_name']))])
-            ->limit(2)
-            ->get(['id', 'name', 'quantity', 'low_stock_threshold']);
-
-        if ($products->count() !== 1) {
-            throw ValidationException::withMessages([
-                'product_name' => $products->isEmpty()
-                    ? 'No product with that name exists in this account.'
-                    : 'More than one product has that name; use a unique product name.',
-            ]);
-        }
-
-        $product = $products->first();
+        $product = $this->resolveRecord($user, 'product', $validated);
         $quantityBefore = $product->quantity;
         $quantityChange = (int) $validated['quantity_change'];
         $quantityAfter = $quantityBefore + $quantityChange;
 
         if ($quantityAfter < 0 || $quantityAfter > 2_147_483_647) {
             throw ValidationException::withMessages([
-                'quantity_change' => 'The adjustment would produce an unsupported stock quantity.',
+                'quantity_change' => __('The adjustment would produce an unsupported stock quantity.'),
             ]);
         }
 
@@ -376,8 +658,8 @@ class AccountOperations
         if ($invoices->count() !== 1) {
             throw ValidationException::withMessages([
                 'invoice_number' => $invoices->isEmpty()
-                    ? 'No approved invoice with an outstanding balance was found in this account.'
-                    : 'More than one invoice has that number; use a unique invoice number.',
+                    ? __('No approved invoice with an outstanding balance was found in this account.')
+                    : __('More than one invoice has that number; use a unique invoice number.'),
             ]);
         }
 
@@ -385,7 +667,7 @@ class AccountOperations
 
         if ($invoice->customer?->user_id !== $user->id || $balance->remainingMinor($invoice) <= 0) {
             throw ValidationException::withMessages([
-                'invoice_number' => 'The selected invoice does not have an outstanding balance.',
+                'invoice_number' => __('The selected invoice does not have an outstanding balance.'),
             ]);
         }
 
@@ -413,12 +695,7 @@ class AccountOperations
      */
     private function createCustomer(User $user, array $data): array
     {
-        $validated = Validator::make($data, [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'address' => ['nullable', 'string', 'max:5000'],
-        ])->validate();
+        $validated = Validator::make($data, $this->customerRules())->validate();
 
         $customer = $user->customers()->create($validated);
 
@@ -513,7 +790,7 @@ class AccountOperations
 
         if ($invoice->customer?->user_id !== $user->id || $remainingMinor <= 0) {
             throw ValidationException::withMessages([
-                'invoice_id' => 'A reminder can only be created for an approved invoice with an outstanding balance.',
+                'invoice_id' => __('A reminder can only be created for an approved invoice with an outstanding balance.'),
             ]);
         }
 
@@ -540,6 +817,8 @@ class AccountOperations
      */
     private function validateProduct(User $user, array $data): array
     {
+        $this->rejectProductPrices($data);
+
         return Validator::make($data, [
             'name' => ['required', 'string', 'max:255'],
             'sku' => [

@@ -1,182 +1,256 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { translate as t } from '@/lib/i18n';
+import { Head, Link } from '@inertiajs/vue3';
+import { ArrowUpRight, Mail, Phone, Plus, Search, Users, X } from '@lucide/vue';
 import { computed, ref } from 'vue';
-import KpiCard from '@/components/KpiCard.vue';
-import StatusBadge from '@/components/StatusBadge.vue';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { formatMoney } from '@/lib/money';
-import type { Customer } from '@/types/customer';
+import AnimatedNumber from '@/components/AnimatedNumber.vue';
+import CustomerEditor from '@/components/CustomerEditor.vue';
+import { show } from '@/routes/customers';
+import type { CustomerRecord } from '@/types/business';
 
-const props = withDefaults(defineProps<{ customers?: Customer[] }>(), {
-    customers: () => [],
-});
-
-type Filter = 'all' | 'balance' | 'overdue' | 'up_to_date';
-const filters: { key: Filter; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'balance', label: 'Has balance' },
-    { key: 'overdue', label: 'Overdue' },
-    { key: 'up_to_date', label: 'Up to date' },
-];
-
-const activeFilter = ref<Filter>('all');
+const props = defineProps<{ customers: CustomerRecord[] }>();
 const search = ref('');
-
-const visible = computed(() => {
-    const q = search.value.trim().toLowerCase();
-    return props.customers.filter((c) => {
-        const matchesFilter =
-            activeFilter.value === 'all' ||
-            (activeFilter.value === 'balance' && c.outstanding > 0) ||
-            (activeFilter.value === 'overdue' && c.status === 'overdue') ||
-            (activeFilter.value === 'up_to_date' && c.status === 'up_to_date');
-        const matchesSearch =
-            !q || [c.name, c.email, c.phone].some((v) => v?.toLowerCase().includes(q));
-        return matchesFilter && matchesSearch;
-    });
-});
-
-const withBalance = computed(() => props.customers.filter((c) => c.outstanding > 0));
-const totalOutstanding = computed(() =>
-    props.customers.reduce((sum, c) => sum + c.outstanding, 0),
+const adding = ref(false);
+const visible = computed(() =>
+    props.customers.filter((customer) =>
+        [customer.name, customer.email, customer.phone].some((value) =>
+            value?.toLowerCase().includes(search.value.toLowerCase()),
+        ),
+    ),
 );
-const overdueAmount = computed(() =>
-    props.customers
-        .filter((c) => c.status === 'overdue')
-        .reduce((sum, c) => sum + c.outstanding, 0),
-);
-const openInvoices = computed(() =>
-    withBalance.value.reduce((sum, c) => sum + c.open_invoices, 0),
-);
-const addedThisMonth = computed(() => {
-    const now = new Date();
-    return props.customers.filter((c) => {
-        const d = new Date(c.created_at);
-        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-    }).length;
-});
-
-const initials = (name: string) =>
-    name
-        .split(' ')
-        .map((part) => part[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase();
-
-const formatDate = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '–';
-
-const columns =
-    'grid grid-cols-[minmax(220px,1fr)_130px_130px_120px_130px_110px] items-center gap-3';
 </script>
 
 <template>
-    <Head title="Customers" />
-
-    <div class="flex flex-col gap-5 p-7">
-        <!-- Header -->
-        <div class="flex items-center gap-3">
-            <div class="flex flex-1 flex-col gap-1">
-                <h1 class="text-h1 text-ink">Customers</h1>
-                <p class="text-sm text-ink-muted">
-                    {{ customers.length }} customers · {{ formatMoney(totalOutstanding) }} outstanding
+    <div class="mf-page flex flex-col gap-7">
+        <Head :title="t('nav.customers')" />
+        <header v-reveal class="flex flex-wrap items-end justify-between gap-5">
+            <div>
+                <p class="mf-kicker mb-2">
+                    {{ t('interface.good_work_starts_with_people') }}
+                </p>
+                <h1
+                    class="font-display text-3xl font-bold tracking-tight text-brand-forest sm:text-4xl dark:text-foreground"
+                >
+                    {{ t('nav.customers') }}
+                </h1>
+                <p
+                    class="mt-2 text-sm leading-relaxed text-ink-muted dark:text-muted-foreground"
+                >
+                    {{
+                        t(
+                            'interface.your_connections_organised_keep_the_details_that_make_working_together_easier',
+                        )
+                    }}
                 </p>
             </div>
-            <!-- The add-customer modal comes next -->
-            <Button class="h-10 rounded-xl px-[18px] font-semibold">Add customer</Button>
-        </div>
+            <button
+                type="button"
+                class="mf-button"
+                :aria-expanded="adding"
+                aria-controls="customer-create-form"
+                @click="adding = !adding"
+            >
+                <X v-if="adding" class="size-4" aria-hidden="true" /><Plus
+                    v-else
+                    class="size-4"
+                    aria-hidden="true"
+                />{{ adding ? t('customers.closeForm') : t('customers.add') }}
+            </button>
+        </header>
 
-        <!-- Summary cards -->
-        <div class="flex flex-col gap-4 md:flex-row">
-            <KpiCard
-                label="Total customers"
-                :value="customers.length"
-                :hint="`${addedThisMonth} added this month`"
-            />
-            <KpiCard
-                label="With a balance"
-                :value="withBalance.length"
-                :hint="`Across ${openInvoices} invoices`"
-            />
-            <KpiCard
-                label="Total outstanding"
-                :value="formatMoney(totalOutstanding)"
-                :hint="`${formatMoney(overdueAmount)} overdue`"
-                danger
-            />
-        </div>
+        <Transition name="customer-form">
+            <div v-if="adding" id="customer-create-form">
+                <CustomerEditor @saved="adding = false" />
+            </div>
+        </Transition>
 
-        <!-- Directory -->
-        <div class="flex flex-col gap-3.5 rounded-[18px] border border-line bg-paper p-5">
-            <div class="flex flex-wrap items-center gap-2.5">
-                <Input
-                    v-model="search"
-                    type="search"
-                    placeholder="Search by name, phone or email"
-                    class="h-[38px] w-80 rounded-xl border-line bg-paper"
-                />
-                <button
-                    v-for="f in filters"
-                    :key="f.key"
-                    type="button"
-                    class="rounded-full border px-3.5 py-[7px] text-sm font-medium"
-                    :class="
-                        activeFilter === f.key
-                            ? 'border-brand-forest bg-brand-forest text-white'
-                            : 'border-line bg-paper text-ink'
-                    "
-                    @click="activeFilter = f.key"
+        <section v-reveal class="mf-card min-w-0 overflow-hidden">
+            <header
+                class="flex flex-wrap items-center justify-between gap-4 border-b border-line/80 p-5 sm:p-6 dark:border-border/80"
+            >
+                <div class="flex items-center gap-3">
+                    <span
+                        class="flex size-10 items-center justify-center rounded-xl bg-brand-mint text-brand-emerald-dark dark:bg-secondary dark:text-[#8bdbb4]"
+                        ><Users
+                            class="size-[18px]"
+                            :stroke-width="1.5"
+                            aria-hidden="true"
+                    /></span>
+                    <div>
+                        <h2
+                            class="text-sm font-semibold text-brand-forest dark:text-foreground"
+                        >
+                            {{ t('interface.your_customer_directory') }}
+                        </h2>
+                        <p
+                            class="mt-1 text-xs text-ink-muted dark:text-muted-foreground"
+                        >
+                            <AnimatedNumber :value="customers.length" />{{
+                                t('interface.customers_in_your_account')
+                            }}
+                        </p>
+                    </div>
+                </div>
+                <div class="relative w-full sm:w-80">
+                    <Search
+                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-muted dark:text-muted-foreground"
+                        aria-hidden="true"
+                    /><input
+                        v-model="search"
+                        type="search"
+                        :aria-label="t('interface.search_customers')"
+                        :placeholder="t('interface.search_name_email_or_phone')"
+                        class="min-h-11 w-full rounded-xl border border-line bg-canvas/70 py-2.5 pr-4 pl-10 text-sm placeholder:text-ink-muted/80 focus:border-brand-emerald focus:ring-3 focus:ring-brand-emerald/10 focus:outline-none dark:border-border dark:bg-background/40"
+                    />
+                </div>
+            </header>
+
+            <div
+                v-if="!visible.length"
+                class="flex flex-col items-center px-6 py-14 text-center"
+            >
+                <div
+                    class="customer-empty-symbol mb-5 flex size-20 items-center justify-center rounded-[24px] bg-brand-mint text-brand-emerald-dark dark:bg-secondary dark:text-[#8bdbb4]"
                 >
-                    {{ f.label }}
+                    <Users
+                        class="size-9"
+                        :stroke-width="1.25"
+                        aria-hidden="true"
+                    />
+                </div>
+                <h3
+                    class="font-display text-2xl font-bold tracking-tight text-brand-forest dark:text-foreground"
+                >
+                    {{
+                        customers.length
+                            ? t('interface.no_matching_connections')
+                            : t('interface.meet_your_next_great_collaboration')
+                    }}
+                </h3>
+                <p
+                    class="mt-2 max-w-sm text-sm leading-relaxed text-ink-muted dark:text-muted-foreground"
+                >
+                    {{
+                        customers.length
+                            ? t(
+                                  'interface.try_a_different_name_email_or_phone_number_to_find_the_right_customer',
+                              )
+                            : t(
+                                  'interface.add_your_first_customer_to_keep_their_contact_details_close_and_start_creating_invoices',
+                              )
+                    }}
+                </p>
+                <button
+                    v-if="search"
+                    type="button"
+                    class="mf-button-secondary mt-6"
+                    @click="search = ''"
+                >
+                    {{ t('interface.clear_search') }}
+                </button>
+                <button
+                    v-else-if="!adding"
+                    type="button"
+                    class="mf-button mt-6"
+                    @click="adding = true"
+                >
+                    <Plus class="size-4" aria-hidden="true" />{{
+                        t('interface.add_your_first_customer')
+                    }}
                 </button>
             </div>
-
-            <div class="overflow-x-auto">
-                <div class="min-w-[900px]">
-                    <div :class="[columns, 'border-b border-line py-2 text-xs text-ink-muted']">
-                        <span>Customer</span>
-                        <span>Phone</span>
-                        <span class="text-right">Total purchases</span>
-                        <span class="text-right">Outstanding</span>
-                        <span>Status</span>
-                        <span>Last purchase</span>
-                    </div>
-
-                    <div
-                        v-for="c in visible"
-                        :key="c.id"
-                        :class="[columns, 'border-b border-line py-3 text-sm text-ink']"
-                    >
-                        <div class="flex items-center gap-2.5">
-                            <div
-                                class="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-mint text-[13px] font-semibold text-brand-forest"
-                            >
-                                {{ initials(c.name) }}
-                            </div>
-                            <div class="min-w-0">
-                                <p class="truncate font-semibold">{{ c.name }}</p>
-                                <p class="truncate text-xs text-ink-muted">{{ c.email }}</p>
-                            </div>
-                        </div>
-                        <span>{{ c.phone }}</span>
-                        <span class="text-right font-semibold">{{ formatMoney(c.total_purchases) }}</span>
-                        <span
-                            class="text-right font-semibold"
-                            :class="c.outstanding === 0 ? 'text-ink-muted' : ''"
-                        >
-                            {{ formatMoney(c.outstanding) }}
-                        </span>
-                        <span><StatusBadge :status="c.status" /></span>
-                        <span>{{ formatDate(c.last_purchase) }}</span>
-                    </div>
-
-                    <p v-if="visible.length === 0" class="py-8 text-center text-sm text-ink-muted">
-                        No customers match your search.
-                    </p>
+            <div v-else class="px-5 sm:px-6">
+                <div
+                    class="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,.65fr)_24px] gap-5 border-b border-line/70 py-3.5 text-[11px] font-semibold tracking-wide text-ink-muted uppercase md:grid dark:border-border/70 dark:text-muted-foreground"
+                >
+                    <span>{{ t('invoices.customer') }}</span
+                    ><span>{{ t('common.email') }}</span
+                    ><span>{{ t('common.phone') }}</span
+                    ><span class="sr-only">{{
+                        t('interface.view_customer')
+                    }}</span>
                 </div>
+                <ul class="divide-y divide-line/70">
+                    <li
+                        v-for="customer in visible"
+                        :key="customer.id"
+                        class="group grid items-center gap-x-5 gap-y-2 py-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,.65fr)_24px]"
+                    >
+                        <Link
+                            :href="show(customer.id)"
+                            class="flex min-w-0 items-center gap-3 text-sm font-semibold text-brand-forest hover:text-brand-emerald-dark dark:text-foreground dark:hover:text-[#a8e8c9]"
+                            ><span
+                                class="flex size-10 shrink-0 items-center justify-center rounded-full border border-brand-emerald/10 bg-brand-mint font-display text-base font-semibold text-brand-forest dark:bg-secondary dark:text-foreground"
+                                aria-hidden="true"
+                                >{{
+                                    customer.name.slice(0, 1).toUpperCase()
+                                }}</span
+                            ><span class="min-w-0 break-words">{{
+                                customer.name
+                            }}</span
+                            ><ArrowUpRight
+                                class="ml-auto size-4 shrink-0 text-brand-emerald-dark md:hidden dark:text-[#8bdbb4]"
+                                aria-hidden="true"
+                        /></Link>
+                        <p
+                            class="flex min-w-0 items-center gap-2 text-sm break-words text-ink-muted max-md:pl-[52px] dark:text-muted-foreground"
+                        >
+                            <Mail
+                                class="size-3.5 shrink-0 text-brand-emerald-dark/65 md:hidden dark:text-[#8bdbb4]"
+                                aria-hidden="true"
+                            /><span class="min-w-0 break-all">{{
+                                customer.email || t('interface.no_email')
+                            }}</span>
+                        </p>
+                        <p
+                            class="flex min-w-0 items-center gap-2 text-sm break-words text-ink-muted max-md:pl-[52px] dark:text-muted-foreground"
+                        >
+                            <Phone
+                                class="size-3.5 shrink-0 text-brand-emerald-dark/65 md:hidden dark:text-[#8bdbb4]"
+                                aria-hidden="true"
+                            />{{ customer.phone || t('interface.no_phone') }}
+                        </p>
+                        <Link
+                            :href="show(customer.id)"
+                            class="hidden size-8 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-brand-mint hover:text-brand-emerald-dark md:flex dark:text-muted-foreground dark:hover:bg-secondary dark:hover:text-[#a8e8c9]"
+                            :aria-label="
+                                t('customers.viewName', { name: customer.name })
+                            "
+                            ><ArrowUpRight class="size-4" aria-hidden="true"
+                        /></Link>
+                    </li>
+                </ul>
             </div>
-        </div>
+            <footer
+                v-if="visible.length"
+                class="border-t border-line/80 bg-canvas/70 px-5 py-3.5 text-xs text-ink-muted sm:px-6 dark:border-border/80 dark:bg-background/40 dark:text-muted-foreground"
+            >
+                {{ visible.length }}{{ t('interface.of') }}{{ customers.length
+                }}{{
+                    t(
+                        'interface.customers_select_a_customer_to_view_or_edit_their_details',
+                    )
+                }}
+            </footer>
+        </section>
     </div>
 </template>
+
+<style scoped>
+.customer-empty-symbol {
+    box-shadow: 0 0 0 10px rgb(229 244 237 / 35%);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .customer-form-enter-active,
+    .customer-form-leave-active {
+        transition:
+            opacity 180ms ease,
+            transform 180ms ease;
+    }
+    .customer-form-enter-from,
+    .customer-form-leave-to {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+}
+</style>

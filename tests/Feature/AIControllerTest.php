@@ -1,10 +1,13 @@
 <?php
 
 use App\Models\User;
+use Carbon\CarbonInterval;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 beforeEach(function () {
-    config(['services.gemini.key' => null]);
+    config(['services.gemini.key' => null, 'services.ai.primary_provider' => 'gemini', 'services.ai.fallback_provider' => null]);
     Http::preventStrayRequests();
 });
 
@@ -77,7 +80,7 @@ test('AI account reads return only low-stock products owned by the authenticated
         ->assertJsonPath('data.count', 1)
         ->assertJsonPath('data.products.0.id', $product->id)
         ->assertJsonPath('data.products.0.quantity', 2)
-        ->assertJsonPath('answer', 'Found 1 products at or below their low-stock threshold.');
+        ->assertJsonPath('answer', fn (string $answer): bool => str_starts_with($answer, 'You have 1 product at or below its low-stock threshold.') && str_contains($answer, 'Coffee'));
     $this->assertDatabaseCount('pending_actions', 0);
     Http::assertSentCount(1);
 });
@@ -91,13 +94,13 @@ test('AI customer creation waits for confirmation and is idempotent', function (
         'action_data' => [
             'name' => 'New customer',
             'email' => 'new@example.test',
-            'phone' => null,
+            'phone' => '+254700000001',
             'address' => null,
         ],
     ])]]]]]])]);
 
     $draft = $this->actingAs($user)->postJson(route('ai.ask'), [
-        'question' => 'Add New customer with email new@example.test.',
+        'question' => 'Add New customer with email new@example.test and phone +254700000001.',
     ]);
 
     $draft->assertOk()
@@ -126,6 +129,7 @@ test('AI customer creation waits for confirmation and is idempotent', function (
         'id' => $customerId,
         'user_id' => $user->id,
         'email' => 'new@example.test',
+        'phone' => '+254700000001',
     ]);
     Http::assertSentCount(1);
 });
@@ -260,4 +264,207 @@ test('AI reminder creation revalidates the outstanding balance at confirmation t
         'type' => 'assistant',
         'confirmed_at' => null,
     ]);
+});
+
+test('an empty account summary contains only the new users recorded counts', function () {
+    config(['services.gemini.key' => 'test-key']);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+        'intent' => 'account_read', 'query' => 'summary', 'message' => 'Revenue grew by 90 percent.',
+    ])]]]]]])]);
+    $user = User::factory()->create();
+    User::factory()->create()->customers()->create(['name' => 'Private customer']);
+
+    $this->actingAs($user)->postJson(route('ai.ask'), ['question' => 'How is my business doing?'])
+        ->assertOk()
+        ->assertJsonPath('answer', fn (string $answer): bool => str_starts_with($answer, 'Your business summary:') && ! str_contains($answer, '90 percent'))
+        ->assertJsonPath('data', [
+            'query' => 'summary', 'customers' => 0, 'total_invoices' => 0, 'paid_invoices' => 0,
+            'outstanding_invoices' => 0, 'totals_by_currency' => [], 'products' => 0,
+            'low_stock_products' => 0, 'approved_invoices' => 0, 'reminders' => 0,
+        ]);
+    Http::assertSentCount(1);
+});
+
+test('earnings contain only completed payments from the requesting account', function () {
+    config(['services.gemini.key' => 'test-key']);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+        'intent' => 'account_read', 'query' => 'revenue',
+    ])]]]]]])]);
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+    foreach ([$owner, $otherUser] as $index => $user) {
+        $customer = $user->customers()->create(['name' => 'Customer']);
+        $invoice = $user->invoices()->create([
+            'customer_id' => $customer->id, 'invoice_number' => 'AI-REVENUE-'.$index,
+            'currency' => 'USD', 'issue_date' => '2026-11-10', 'subtotal' => '100', 'total' => '100', 'status' => 'approved',
+        ]);
+        $invoice->payments()->create(['currency' => 'USD', 'amount' => $index === 0 ? '25' : '75', 'status' => 'completed']);
+        $invoice->payments()->create(['currency' => 'USD', 'amount' => '10', 'status' => 'pending']);
+        $invoice->payments()->create(['currency' => 'EUR', 'amount' => '999', 'status' => 'completed']);
+    }
+
+    $this->actingAs($owner)->postJson(route('ai.ask'), ['question' => 'Show my earnings'])
+        ->assertOk()->assertJsonPath('data.totals_by_currency', [['currency' => 'USD', 'total' => '25.00']]);
+    $this->actingAs($otherUser)->postJson(route('ai.ask'), ['question' => 'Show my earnings'])
+        ->assertOk()->assertJsonPath('data.totals_by_currency', [['currency' => 'USD', 'total' => '75.00']]);
+    $this->actingAs(User::factory()->create())->postJson(route('ai.ask'), ['question' => 'Show my earnings'])
+        ->assertOk()->assertJsonPath('data.totals_by_currency', []);
+    Http::assertSentCount(3);
+});
+
+test('Gemini failures return an error without financial answers or invoice writes', function (string $route, array $payload) {
+    config(['services.gemini.key' => 'test-key']);
+    Sleep::fake();
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response([], 503)]);
+
+    $this->actingAs(User::factory()->create())->postJson(route($route), $payload)
+        ->assertStatus(502)->assertExactJson(['message' => 'AI service is temporarily unavailable.']);
+    $this->assertDatabaseCount('invoices', 0);
+    $this->assertDatabaseCount('pending_actions', 0);
+    Http::assertSentCount(3);
+})->with([
+    'ask' => ['ai.ask', ['question' => 'How is my business doing?']],
+    'invoice' => ['ai.invoice.generate', ['prompt' => 'Invoice Mary for design work']],
+]);
+
+test('the invoice generator previews before explicit confirmation creates the invoice', function () {
+    config(['services.gemini.key' => 'test-key']);
+    $user = User::factory()->create();
+    $customer = $user->customers()->create(['name' => 'Mary']);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+        'intent' => 'invoice', 'customer_name' => 'Mary', 'currency' => 'USD', 'issue_date' => '2026-11-10', 'due_date' => null,
+        'items' => [['description' => 'Design', 'quantity' => 2, 'unit_price' => '25.00']],
+    ])]]]]]])]);
+
+    $preview = $this->actingAs($user)->postJson(route('ai.invoice.generate'), ['prompt' => 'Invoice Mary USD 25 each for two designs on 2026-11-10'])
+        ->assertOk()->assertJsonPath('draft.customer_id', $customer->id)->assertJsonPath('draft.items.0.quantity', 2);
+    $this->assertDatabaseCount('invoices', 0);
+    $this->postJson(route('ai.invoice.confirm'), ['confirmation_token' => $preview->json('confirmation.token')])
+        ->assertOk()->assertJsonPath('invoice.total', '50.00')->assertJsonPath('invoice.status', 'draft');
+    $this->assertDatabaseHas('invoices', ['user_id' => $user->id, 'customer_id' => $customer->id, 'total' => '50.00']);
+    Http::assertSentCount(1);
+});
+
+test('Gemini API errors explain the required configuration or quota action', function (int $status, string $message) {
+    config(['services.gemini.key' => 'test-key']);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'Provider details']], $status)]);
+
+    $this->actingAs(User::factory()->create())->postJson(route('ai.ask'), ['question' => 'How is my business doing?'])
+        ->assertStatus(502)->assertExactJson(['message' => $message]);
+    $this->assertDatabaseCount('pending_actions', 0);
+    Http::assertSentCount(1);
+})->with([
+    [400, 'Gemini rejected the request. Check the configured model and request options.'],
+    [401, 'Gemini access was rejected. Check the API key and project permissions.'],
+    [403, 'Gemini access was rejected. Check the API key and project permissions.'],
+    [404, 'The configured Gemini model is unavailable. Check GEMINI_MODEL for a supported model.'],
+    [429, 'Gemini quota or rate limit exceeded. Check your project quota and try again later.'],
+    [500, 'AI service is temporarily unavailable.'],
+]);
+
+test('Gemini connection failures return clear errors and do not create invoices', function () {
+    config(['services.gemini.key' => 'test-key']);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::failedConnection()]);
+
+    $this->actingAs(User::factory()->create())->postJson(route('ai.invoice.generate'), ['prompt' => 'Invoice Mary'])
+        ->assertStatus(502)->assertExactJson(['message' => 'Unable to connect to the AI service.']);
+    $this->assertDatabaseCount('invoices', 0);
+});
+
+test('invalid Gemini generation output is rejected without writes', function (string $text, int $status) {
+    config(['services.gemini.key' => 'test-key']);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => $text]]]]]])]);
+
+    $this->actingAs(User::factory()->create())->postJson(route('ai.invoice.generate'), ['prompt' => 'Invoice Mary'])
+        ->assertStatus($status);
+    $this->assertDatabaseCount('invoices', 0);
+    $this->assertDatabaseCount('pending_actions', 0);
+    Http::assertSentCount(1);
+})->with([['not JSON', 502], ['{}', 422], ['[]', 502]]);
+
+test('Gemini retries transient failures with bounded exponential backoff and unchanged tool requests', function (string $failure) {
+    config(['services.gemini.key' => 'test-key']);
+    Sleep::fake();
+    $sequence = Http::sequence();
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+        if ($failure === 'timeout') {
+            $sequence->pushFailedConnection('cURL error 28: Operation timed out');
+        } else {
+            $sequence->pushStatus(503);
+        }
+    }
+    $sequence->push(['candidates' => [['content' => ['parts' => [['text' => '{"intent":"account_read","query":"summary"}']]]]]]);
+    Http::fake(function (Request $request, array $options) use ($sequence) {
+        expect($options['timeout'])->toBe(8)
+            ->and($options['connect_timeout'])->toBe(3)
+            ->and($request['toolConfig']['functionCallingConfig']['mode'])->toBe('ANY');
+
+        return $sequence($request, $options);
+    });
+    User::factory()->create()->customers()->create(['name' => 'Other account']);
+
+    $this->actingAs(User::factory()->create())->postJson(route('ai.ask'), ['question' => 'Summarize my account'])
+        ->assertOk()->assertJsonPath('data.customers', 0)->assertJsonPath('data.total_invoices', 0);
+
+    Http::assertSentCount(3);
+    Sleep::assertSleptTimes(2);
+    Sleep::assertSlept(fn (CarbonInterval $duration): bool => $duration->totalMilliseconds >= 500 && $duration->totalMilliseconds <= 750, 1);
+    Sleep::assertSlept(fn (CarbonInterval $duration): bool => $duration->totalMilliseconds >= 1000 && $duration->totalMilliseconds <= 1250, 1);
+    expect(Http::recorded()->map(fn (array $pair): array => $pair[0]->data())->unique()->count())->toBe(1);
+})->with(['HTTP 503' => 'unavailable', 'connection timeout' => 'timeout']);
+
+test('Gemini stops after two timeout retries without creating invoice state', function () {
+    config(['services.gemini.key' => 'test-key']);
+    Sleep::fake();
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()
+        ->pushFailedConnection('cURL error 28: Operation timed out')
+        ->pushFailedConnection('cURL error 28: Operation timed out')
+        ->pushFailedConnection('cURL error 28: Operation timed out')
+        ->pushStatus(200)]);
+
+    $this->actingAs(User::factory()->create())->postJson(route('ai.invoice.generate'), ['prompt' => 'Invoice Mary'])
+        ->assertStatus(502)->assertExactJson(['message' => 'Unable to connect to the AI service.']);
+
+    Http::assertSentCount(3);
+    Sleep::assertSleptTimes(2);
+    $this->assertDatabaseCount('invoices', 0);
+    $this->assertDatabaseCount('pending_actions', 0);
+});
+
+test('Gemini stops retrying when a transient response becomes a permanent error', function (int $status) {
+    config(['services.gemini.key' => 'test-key']);
+    Sleep::fake();
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()->pushStatus(503)->pushStatus($status)->pushStatus(200)]);
+
+    $this->actingAs(User::factory()->create())->postJson(route('ai.ask'), ['question' => 'Summarize my account'])
+        ->assertStatus(502)->assertJsonStructure(['message']);
+
+    Http::assertSentCount(2);
+    Sleep::assertSleptTimes(1);
+    $this->assertDatabaseCount('pending_actions', 0);
+})->with([400, 401, 403, 404]);
+
+test('a retried invoice preview creates one draft only after confirmation without further Gemini calls', function () {
+    config(['services.gemini.key' => 'test-key']);
+    Sleep::fake();
+    $user = User::factory()->create();
+    $user->customers()->create(['name' => 'Mary']);
+    Http::fake(['generativelanguage.googleapis.com/*' => Http::sequence()->pushStatus(503)->push([
+        'candidates' => [['content' => ['parts' => [['text' => json_encode([
+            'intent' => 'invoice', 'customer_name' => 'Mary', 'currency' => 'USD', 'issue_date' => '2026-11-10', 'due_date' => null,
+            'items' => [['description' => 'Design', 'quantity' => 2, 'unit_price' => '25.00']],
+        ])]]]]],
+    ])]);
+
+    $preview = $this->actingAs($user)->postJson(route('ai.invoice.generate'), ['prompt' => 'Invoice Mary for two designs at USD 25 each'])
+        ->assertOk()->assertJsonPath('draft.items.0.quantity', 2);
+    $this->assertDatabaseCount('invoices', 0);
+    $this->assertDatabaseCount('pending_actions', 1);
+
+    $payload = ['confirmation_token' => $preview->json('confirmation.token')];
+    $this->postJson(route('ai.invoice.confirm'), $payload)->assertOk()->assertJsonPath('invoice.total', '50.00');
+    $this->postJson(route('ai.invoice.confirm'), $payload)->assertOk();
+    $this->assertDatabaseCount('invoices', 1);
+    Http::assertSentCount(2);
+    Sleep::assertSleptTimes(1);
 });

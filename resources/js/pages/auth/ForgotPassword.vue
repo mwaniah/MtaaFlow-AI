@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { translate as t } from '@/lib/i18n';
 import { Form, Head } from '@inertiajs/vue3';
 import InputError from '@/components/InputError.vue';
 import TextLink from '@/components/TextLink.vue';
@@ -11,8 +12,14 @@ import { email } from '@/routes/password';
 
 defineOptions({
     layout: {
-        title: 'Forgot password',
-        description: 'Enter your email to receive a password reset link',
+        get title() {
+            return t('interface.forgot_password');
+        },
+        get description() {
+            return t(
+                'interface.enter_your_email_to_receive_a_password_reset_link',
+            );
+        },
     },
 });
 
@@ -22,7 +29,7 @@ defineProps<{
 </script>
 
 <template>
-    <Head title="Forgot password" />
+    <Head :title="t('interface.forgot_password')" />
 
     <div
         v-if="status"
@@ -34,14 +41,14 @@ defineProps<{
     <div class="space-y-6">
         <Form v-bind="email.form()" v-slot="{ errors, processing }">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{{ t('common.email') }}</Label>
                 <Input
                     id="email"
                     type="email"
                     name="email"
                     autocomplete="off"
                     v-focus
-                    placeholder="email@example.com"
+                    :placeholder="t('interface.email_example_com')"
                 />
                 <InputError :message="errors.email" />
             </div>
@@ -52,15 +59,16 @@ defineProps<{
                     :disabled="processing"
                     data-test="email-password-reset-link-button"
                 >
-                    <Spinner v-if="processing" />
-                    Email password reset link
-                </Button>
+                    <Spinner v-if="processing" />{{
+                        t('interface.email_password_reset_link')
+                    }}</Button
+                >
             </div>
         </Form>
 
         <div class="space-x-1 text-center text-sm text-muted-foreground">
-            <span>Or, return to</span>
-            <TextLink :href="login()">log in</TextLink>
+            <span>{{ t('interface.or_return_to') }}</span>
+            <TextLink :href="login()">{{ t('interface.log_in') }}</TextLink>
         </div>
     </div>
 </template>

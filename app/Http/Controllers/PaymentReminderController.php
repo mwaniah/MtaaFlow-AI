@@ -53,7 +53,7 @@ class PaymentReminderController extends Controller
                 || $balance->remainingMinor($invoice) <= 0
             ) {
                 throw ValidationException::withMessages([
-                    'invoice_id' => 'A reminder can only be created for an approved invoice with an outstanding balance.',
+                    'invoice_id' => __('A reminder can only be created for an approved invoice with an outstanding balance.'),
                 ]);
             }
 
@@ -72,8 +72,7 @@ class PaymentReminderController extends Controller
         Request $request,
         PaymentReminder $paymentReminder,
         InvoiceBalance $balance,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:10000'],
         ]);
@@ -94,8 +93,7 @@ class PaymentReminderController extends Controller
         Request $request,
         PaymentReminder $paymentReminder,
         InvoiceBalance $balance,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         DB::transaction(function () use ($request, $paymentReminder, $balance): void {
             $this->findEditableDraft($request, $paymentReminder, $balance)->delete();
         });
@@ -107,8 +105,7 @@ class PaymentReminderController extends Controller
         Request $request,
         PaymentReminder $paymentReminder,
         InvoiceBalance $balance,
-    ): PaymentReminder
-    {
+    ): PaymentReminder {
         $reminder = PaymentReminder::query()
             ->whereKey($paymentReminder->getKey())
             ->where('status', 'draft')

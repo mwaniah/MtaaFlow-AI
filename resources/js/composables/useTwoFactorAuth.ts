@@ -1,3 +1,4 @@
+import { translate as t } from '@/lib/i18n';
 import { useHttp } from '@inertiajs/vue3';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, ref } from 'vue';
@@ -39,7 +40,7 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
 
             qrCodeSvg.value = svg;
         } catch {
-            errors.value.push('Failed to fetch QR code');
+            errors.value.push(t('errors.qr'));
             qrCodeSvg.value = null;
         }
     };
@@ -52,7 +53,7 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
 
             manualSetupKey.value = key;
         } catch {
-            errors.value.push('Failed to fetch a setup key');
+            errors.value.push(t('errors.setupKey'));
             manualSetupKey.value = null;
         }
     };
@@ -80,7 +81,7 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
                 recoveryCodes(),
             )) as string[];
         } catch {
-            errors.value.push('Failed to fetch recovery codes');
+            errors.value.push(t('errors.recoveryCodes'));
             recoveryCodesList.value = [];
         }
     };

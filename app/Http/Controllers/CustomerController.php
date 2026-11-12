@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\CustomerValidationRules;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class CustomerController extends Controller
 {
+    use CustomerValidationRules;
+
     // Display the customers page
     public function index(Request $request)
     {
@@ -15,25 +18,20 @@ class CustomerController extends Controller
             'customers' => $request->user()
                 ->customers()
                 ->latest()
-                ->get()
+                ->get(),
         ]);
     }
 
     // Save a new customer
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255',
-            'phone' => 'nullable|string|max:30',
-            'address' => 'nullable|string',
-        ]);
+        $validated = $request->validate($this->customerRules());
 
         $request->user()->customers()->create($validated);
 
         return redirect()
             ->route('customers.index')
-            ->with('success', 'Customer added successfully');
+            ->with('success', __('Customer added successfully'));
     }
 
     // Display one customer's information
@@ -44,7 +42,7 @@ class CustomerController extends Controller
             ->findOrFail($customer->id);
 
         return Inertia::render('Customers/Show', [
-            'customer' => $customer
+            'customer' => $customer,
         ]);
     }
 
@@ -55,18 +53,13 @@ class CustomerController extends Controller
             ->customers()
             ->findOrFail($customer->id);
 
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|email|max:255',
-            'phone' => 'nullable|string|max:30',
-            'address' => 'nullable|string',
-        ]);
+        $validated = $request->validate($this->customerRules($customer));
 
         $customer->update($validated);
 
         return redirect()
             ->route('customers.index')
-            ->with('success', 'Customer updated successfully');
+            ->with('success', __('Customer updated successfully'));
     }
 
     // Delete a customer
@@ -78,7 +71,7 @@ class CustomerController extends Controller
 
         if ($customer->invoices()->exists()) {
             return back()->withErrors([
-                'customer' => 'Cannot delete a customer who has invoices.'
+                'customer' => __('Cannot delete a customer who has invoices.'),
             ]);
         }
 
@@ -86,6 +79,6 @@ class CustomerController extends Controller
 
         return redirect()
             ->route('customers.index')
-            ->with('success', 'Customer deleted successfully');
+            ->with('success', __('Customer deleted successfully'));
     }
 }

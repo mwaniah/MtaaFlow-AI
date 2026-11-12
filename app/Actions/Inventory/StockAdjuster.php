@@ -20,7 +20,7 @@ class StockAdjuster
     ): InventoryAdjustment {
         if ($quantityChange === 0) {
             throw ValidationException::withMessages([
-                'quantity_change' => 'The quantity change must not be zero.',
+                'quantity_change' => __('The quantity change must not be zero.'),
             ]);
         }
 
@@ -35,13 +35,13 @@ class StockAdjuster
 
             if ($quantityAfter < 0) {
                 throw ValidationException::withMessages([
-                    'quantity_change' => 'The adjustment cannot reduce stock below zero.',
+                    'quantity_change' => __('The adjustment cannot reduce stock below zero.'),
                 ]);
             }
 
             if ($quantityAfter > self::MAX_QUANTITY) {
                 throw ValidationException::withMessages([
-                    'quantity_change' => 'The adjustment exceeds the maximum supported stock quantity.',
+                    'quantity_change' => __('The adjustment exceeds the maximum supported stock quantity.'),
                 ]);
             }
 

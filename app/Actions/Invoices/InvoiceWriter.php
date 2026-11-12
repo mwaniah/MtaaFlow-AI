@@ -115,26 +115,62 @@ class InvoiceWriter
         });
     }
 
+    public function approve(Invoice $invoice): void
+    {
+        DB::transaction(function () use ($invoice): void {
+            $invoice = $invoice->newQuery()
+                ->whereKey($invoice->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->ensureDraft($invoice);
+
+            if (! $invoice->items()->exists()) {
+                throw ValidationException::withMessages([
+                    'invoice' => __('An invoice must have at least one item.'),
+                ]);
+            }
+
+            $invoice->update(['status' => 'approved']);
+        });
+    }
+
+    /**
+     * @param  array{currency: string, items: array<int, array{description: string, quantity: int|string, unit_price: int|float|string}>}  $validated
+     */
+    public function totalMinor(array $validated): int
+    {
+        $totalMinor = 0;
+        $maximumInvoiceMinor = 999999999999;
+
+        foreach ($validated['items'] as $item) {
+            $unitMinor = Currency::minor((string) $item['unit_price'], $validated['currency']);
+            $quantity = (int) $item['quantity'];
+
+            if ($unitMinor > intdiv($maximumInvoiceMinor - $totalMinor, $quantity)) {
+                throw ValidationException::withMessages([
+                    'items' => __('The invoice total is too large.'),
+                ]);
+            }
+
+            $totalMinor += $unitMinor * $quantity;
+        }
+
+        return $totalMinor;
+    }
+
     /**
      * @param  array<int, array{description: string, quantity: int|string, unit_price: int|float|string}>  $items
      */
     private function saveItems(Invoice $invoice, array $items): void
     {
-        $totalMinor = 0;
-        $maximumInvoiceMinor = 999999999999;
+        $totalMinor = $this->totalMinor(['currency' => $invoice->currency, 'items' => $items]);
 
         foreach ($items as $item) {
             $unitMinor = Currency::minor((string) $item['unit_price'], $invoice->currency);
             $quantity = (int) $item['quantity'];
 
-            if ($unitMinor > intdiv($maximumInvoiceMinor - $totalMinor, $quantity)) {
-                throw ValidationException::withMessages([
-                    'items' => 'The invoice total is too large.',
-                ]);
-            }
-
             $amountMinor = $unitMinor * $quantity;
-            $totalMinor += $amountMinor;
 
             $invoice->items()->create([
                 'description' => $item['description'],
@@ -156,7 +192,7 @@ class InvoiceWriter
     {
         if ($invoice->status !== 'draft') {
             throw ValidationException::withMessages([
-                'invoice' => 'Only draft invoices can be modified.',
+                'invoice' => __('Only draft invoices can be modified.'),
             ]);
         }
     }

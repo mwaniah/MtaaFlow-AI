@@ -34,10 +34,21 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'ai' => [
+        'primary_provider' => env('AI_PRIMARY_PROVIDER', 'groq'),
+        'fallback_provider' => env('AI_FALLBACK_PROVIDER', 'gemini'),
+        'fallback_on_rate_limit' => env('AI_FALLBACK_ON_RATE_LIMIT', true),
+    ],
+
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'openai/gpt-oss-20b'),
+    ],
+
     // gemini API configuration
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.8-flash'),
     ],
 
     'paypal' => [

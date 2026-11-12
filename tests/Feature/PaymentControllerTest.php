@@ -2,6 +2,7 @@
 
 use App\Models\Payment;
 use App\Models\User;
+use Inertia\Testing\AssertableInertia;
 
 test('payment listing includes only payments belonging to the authenticated user', function () {
     $user = User::factory()->create();
@@ -126,3 +127,16 @@ test('payment routes do not accept payment creation requests', function () {
     $response->assertMethodNotAllowed();
     $this->assertDatabaseMissing('payments', ['invoice_id' => $invoice->id]);
 });
+
+test('payment page totals preserve each currencys supported decimal precision', function (string $currency, string $amount, string $expected) {
+    $user = User::factory()->create();
+    $customer = $user->customers()->create(['name' => 'Currency customer']);
+    $invoice = $user->invoices()->create([
+        'customer_id' => $customer->id, 'invoice_number' => 'PRECISION-'.$currency, 'currency' => $currency,
+        'subtotal' => $amount, 'total' => $amount, 'status' => 'paid', 'issue_date' => '2026-11-10',
+    ]);
+    $invoice->payments()->create(['amount' => $amount, 'currency' => $currency, 'status' => 'completed']);
+
+    $this->actingAs($user)->get(route('payments.index'))->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('totals.0.currency', $currency)->where('totals.0.total', $expected));
+})->with([['KWD', '1.125', '1.125'], ['JPY', '123', '123']]);

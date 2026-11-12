@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { translate as t } from '@/lib/i18n';
 import { Form, Head } from '@inertiajs/vue3';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
 import Heading from '@/components/Heading.vue';
@@ -24,7 +25,9 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Security settings',
+                get title() {
+                    return t('interface.security_settings');
+                },
                 href: edit(),
             },
         ],
@@ -33,15 +36,19 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Security settings" />
+    <Head :title="t('interface.security_settings')" />
 
-    <h1 class="sr-only">Security settings</h1>
+    <h1 class="sr-only">{{ t('interface.security_settings') }}</h1>
 
     <div class="space-y-6">
         <Heading
             variant="small"
-            title="Update password"
-            description="Ensure your account is using a long, random password to stay secure"
+            :title="t('interface.update_password')"
+            :description="
+                t(
+                    'interface.ensure_your_account_is_using_a_long_random_password_to_stay_secure',
+                )
+            "
         />
 
         <Form
@@ -59,38 +66,42 @@ defineOptions({
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
-                <Label for="current_password">Current password</Label>
+                <Label for="current_password">{{
+                    t('interface.current_password')
+                }}</Label>
                 <PasswordInput
                     id="current_password"
                     name="current_password"
                     class="mt-1 block w-full"
                     autocomplete="current-password"
-                    placeholder="Current password"
+                    :placeholder="t('interface.current_password')"
                 />
                 <InputError :message="errors.current_password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">New password</Label>
+                <Label for="password">{{ t('interface.new_password') }}</Label>
                 <PasswordInput
                     id="password"
                     name="password"
                     class="mt-1 block w-full"
                     autocomplete="new-password"
-                    placeholder="New password"
+                    :placeholder="t('interface.new_password')"
                     :passwordrules="props.passwordRules"
                 />
                 <InputError :message="errors.password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation">Confirm password</Label>
+                <Label for="password_confirmation">{{
+                    t('auth.confirmPassword')
+                }}</Label>
                 <PasswordInput
                     id="password_confirmation"
                     name="password_confirmation"
                     class="mt-1 block w-full"
                     autocomplete="new-password"
-                    placeholder="Confirm password"
+                    :placeholder="t('auth.confirmPassword')"
                     :passwordrules="props.passwordRules"
                 />
                 <InputError :message="errors.password_confirmation" />
@@ -100,9 +111,8 @@ defineOptions({
                 <Button
                     :disabled="processing"
                     data-test="update-password-button"
+                    >{{ t('common.save') }}</Button
                 >
-                    Save
-                </Button>
             </div>
         </Form>
     </div>

@@ -33,7 +33,7 @@ class PaymentReminderDeliveryController extends Controller
                 ->firstOrFail();
 
             if ($reminder->status !== 'draft') {
-                abort(409, 'Only draft reminders can be delivered.');
+                abort(409, __('Only draft reminders can be delivered.'));
             }
 
             $invoice = $request->user()->invoices()
@@ -54,7 +54,7 @@ class PaymentReminderDeliveryController extends Controller
 
             if ($remainingMinor <= 0) {
                 throw ValidationException::withMessages([
-                    'invoice_id' => 'A reminder can only be delivered while the invoice has an outstanding balance.',
+                    'invoice_id' => __('A reminder can only be delivered while the invoice has an outstanding balance.'),
                 ]);
             }
 
@@ -65,7 +65,7 @@ class PaymentReminderDeliveryController extends Controller
 
                 if (! is_string($email) || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
                     throw ValidationException::withMessages([
-                        'channel' => 'The customer does not have a valid email address on file.',
+                        'channel' => __('The customer does not have a valid email address on file.'),
                     ]);
                 }
 
@@ -97,7 +97,7 @@ class PaymentReminderDeliveryController extends Controller
 
             if (preg_match('/\A[1-9]\d{7,14}\z/', $phoneNumber) !== 1) {
                 throw ValidationException::withMessages([
-                    'channel' => 'The customer phone number must include an international country code for WhatsApp.',
+                    'channel' => __('The customer phone number must include an international country code for WhatsApp.'),
                 ]);
             }
 

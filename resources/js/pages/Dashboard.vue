@@ -1,288 +1,561 @@
 <script setup lang="ts">
-import { Head, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
-import StatusBadge from '@/components/StatusBadge.vue';
-import { formatMoney } from '@/lib/money';
-import { dashboard } from '@/routes';
+import { statusLabel } from '@/lib/i18n';
+import { translate as t } from '@/lib/i18n';
+import { Head, Link } from '@inertiajs/vue3';
+import {
+    ArrowDownLeft,
+    ArrowRight,
+    ArrowUpRight,
+    Check,
+    Clock3,
+    FileText,
+    Plus,
+    Sparkles,
+    Users,
+    Wallet,
+} from '@lucide/vue';
+import AnimatedNumber from '@/components/AnimatedNumber.vue';
+import { index as askIndex } from '@/routes/ask';
+import { index as customersIndex } from '@/routes/customers';
+import { create, index as invoicesIndex, show } from '@/routes/invoices';
+import { index as reportsIndex } from '@/routes/reports';
+import {
+    money,
+    date,
+    type InvoiceRecord,
+    type PaymentRecord,
+    type CurrencyTotal,
+} from '@/types/business';
 
-defineOptions({
-    layout: {
-        breadcrumbs: [
-            {
-                title: 'Dashboard',
-                href: dashboard(),
-            },
-        ],
-    },
-});
-
-type BadgeStatus = 'paid' | 'pending' | 'partial' | 'overdue' | 'draft' | 'cancelled' | 'up_to_date';
-
-interface Stats {
-    total_sales: number;
-    sales_change_pct: number | null;
-    payments_received: number;
-    outstanding: number;
-    outstanding_invoices: number;
-    overdue: number;
-    overdue_invoices: number;
-}
-interface RevenuePoint { month: string; value: number }
-interface Insight { title: string; body: string }
-interface RecentInvoice { id: number; number: string; customer_name: string; total_amount: number; status: BadgeStatus }
-interface Transaction { id: number; label: string; amount: number; failed: boolean }
-interface TopSeller { name: string; sold: number }
-interface LowStockItem { id: number; product: string; left: number }
-
-// Everything here is sent by DashboardController. With no data it shows empty states.
-const props = withDefaults(
-    defineProps<{
-        stats?: Stats;
-        revenue?: RevenuePoint[];
-        insights?: Insight[];
-        invoices?: RecentInvoice[];
-        transactions?: Transaction[];
-        topSellers?: TopSeller[];
-        lowStock?: LowStockItem[];
-    }>(),
-    {
-        stats: () => ({
-            total_sales: 0,
-            sales_change_pct: null,
-            payments_received: 0,
-            outstanding: 0,
-            outstanding_invoices: 0,
-            overdue: 0,
-            overdue_invoices: 0,
-        }),
-        revenue: () => [],
-        insights: () => [],
-        invoices: () => [],
-        transactions: () => [],
-        topSellers: () => [],
-        lowStock: () => [],
-    },
-);
-
-// Greeting uses the logged-in user's first name.
-const page = usePage();
-const firstName = computed(() => {
-    const user = (page.props as unknown as { auth?: { user?: { name?: string } } }).auth?.user;
-    return user?.name?.split(' ')[0] ?? '';
-});
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
-const summary = computed(() => {
-    const s = props.stats;
-    if (s.outstanding_invoices === 0) return 'Nothing is waiting on payment right now.';
-    const base = `${formatMoney(s.outstanding)} is waiting on ${plural(s.outstanding_invoices, 'invoice')}.`;
-    if (s.overdue_invoices === 0) return base;
-    return `${base} ${s.overdue_invoices === 1 ? 'One is' : `${s.overdue_invoices} are`} overdue.`;
-});
-
-const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
-
-const kpis = computed(() => {
-    const s = props.stats;
-    const change =
-        s.sales_change_pct === null
-            ? 'No earlier month to compare'
-            : `${s.sales_change_pct > 0 ? '+' : ''}${s.sales_change_pct}% on last month`;
-    return [
-        { label: `Total sales · ${monthName}`, value: formatMoney(s.total_sales), note: change, variant: 'featured' },
-        { label: 'Payments received', value: formatMoney(s.payments_received), note: 'Verified via PayPal', variant: 'default' },
-        { label: 'Outstanding', value: formatMoney(s.outstanding), note: plural(s.outstanding_invoices, 'invoice'), variant: 'default' },
-        { label: 'Overdue', value: formatMoney(s.overdue), note: plural(s.overdue_invoices, 'invoice'), variant: 'danger' },
-    ];
-});
-
-const maxRevenue = computed(() => Math.max(1, ...props.revenue.map((r) => r.value)));
-const maxSold = computed(() => Math.max(1, ...props.topSellers.map((p) => p.sold)));
+const props = defineProps<{
+    totalCustomers: number;
+    totalInvoices: number;
+    paidInvoiceCount: number;
+    outstandingInvoiceCount: number;
+    recentInvoices: InvoiceRecord[];
+    recentPayments: PaymentRecord[];
+    verifiedEarningsByCurrency: CurrencyTotal[];
+    outstandingInvoiceTotalsByCurrency: CurrencyTotal[];
+    invoicedTotalsByCurrency: CurrencyTotal[];
+}>();
 </script>
 
 <template>
-    <Head title="Dashboard" />
-
-    <div class="flex h-full flex-1 flex-col gap-5 overflow-x-auto rounded-xl p-7">
-        <!-- Greeting -->
-        <div class="flex flex-col gap-1">
-            <h1 class="font-display text-[28px] leading-[1.15] font-bold tracking-[-0.02em] text-[#202a27]">
-                Habari{{ firstName ? `, ${firstName}` : '' }}
-            </h1>
-            <p class="text-sm text-[#6b7773]">{{ summary }}</p>
-        </div>
-
-        <!-- KPIs -->
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div
-                v-for="kpi in kpis"
-                :key="kpi.label"
-                class="flex flex-col gap-2.5 rounded-[18px] p-5"
-                :class="
-                    kpi.variant === 'featured'
-                        ? 'bg-gradient-to-br from-[#123d32] to-[#1b5b49]'
-                        : 'border border-[#e6e4dc] bg-white'
-                "
-            >
-                <p class="text-xs" :class="kpi.variant === 'featured' ? 'text-[#a9cdbf]' : 'text-[#6b7773]'">
-                    {{ kpi.label }}
+    <div class="mf-page flex flex-col gap-7">
+        <Head :title="t('nav.dashboard')" />
+        <header v-reveal class="flex flex-wrap items-end justify-between gap-5">
+            <div>
+                <p class="mf-kicker mb-2">
+                    {{ t('interface.your_business_in_focus') }}
                 </p>
-                <p
-                    class="font-display text-[34px] leading-[1.15] font-bold tracking-[-0.02em]"
-                    :class="{
-                        'text-white': kpi.variant === 'featured',
-                        'text-[#202a27]': kpi.variant === 'default',
-                        'text-[#b4432f]': kpi.variant === 'danger',
-                    }"
+                <h1
+                    class="font-display text-3xl font-bold tracking-tight text-brand-forest sm:text-4xl dark:text-foreground"
                 >
-                    {{ kpi.value }}
-                </p>
-                <p class="text-xs" :class="kpi.variant === 'featured' ? 'text-[#a9cdbf]' : 'text-[#6b7773]'">
-                    {{ kpi.note }}
+                    {{ t('nav.dashboard') }}
+                </h1>
+                <p
+                    class="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted dark:text-muted-foreground"
+                >
+                    {{
+                        t(
+                            'interface.a_little_clarity_for_your_next_big_move_your_invoices_payments_and_customers_together',
+                        )
+                    }}
                 </p>
             </div>
-        </div>
+            <Link
+                :href="create({ query: { mode: 'manual' } })"
+                class="mf-button"
+            >
+                <Plus class="size-4" aria-hidden="true" />{{
+                    t('invoices.create')
+                }}</Link
+            >
+        </header>
 
-        <!-- Revenue + AI insights -->
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <section class="flex flex-col gap-2.5 rounded-[18px] border border-[#e6e4dc] bg-white p-5 lg:col-span-3">
-                <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">Revenue</h2>
-                <p class="text-xs text-[#6b7773]">Last 6 months</p>
-                <p v-if="revenue.length === 0" class="py-10 text-center text-sm text-[#6b7773]">
-                    No revenue yet. It appears once invoices are paid.
-                </p>
-                <div v-else class="flex items-end gap-3.5 pt-3" style="height: 208px">
-                    <div v-for="(r, i) in revenue" :key="r.month" class="flex flex-1 flex-col items-center gap-1.5">
-                        <div
-                            class="w-full rounded-t-[8px] rounded-b-[3px]"
-                            :class="i === revenue.length - 1 ? 'bg-[#15966b]' : 'bg-[#e5f4ed]'"
-                            :style="{ height: `${(r.value / maxRevenue) * 165.6}px` }"
-                            role="img"
-                            :aria-label="`${r.month}: ${formatMoney(r.value)}`"
-                        />
-                        <span class="text-xs text-[#6b7773]">{{ r.month }}</span>
-                    </div>
-                </div>
-            </section>
-
-            <section class="flex flex-col gap-2.5 rounded-[18px] border border-[#e6e4dc] bg-white p-5 lg:col-span-2">
-                <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">
-                    MtaaFlow noticed
-                </h2>
-                <p v-if="insights.length === 0" class="text-sm text-[#6b7773]">
-                    Nothing to report yet. Tips appear as you add invoices.
-                </p>
-                <div
-                    v-for="insight in insights"
-                    :key="insight.title"
-                    class="flex flex-col gap-[3px] rounded-[14px] border-l-4 border-[#15966b] bg-[#e5f4ed] px-3.5 py-3"
-                >
-                    <p class="text-sm font-semibold text-[#202a27]">{{ insight.title }}</p>
-                    <p class="text-xs text-[#6b7773]">{{ insight.body }}</p>
-                </div>
-                <button
-                    type="button"
-                    class="mt-1 self-start rounded-xl border-[1.5px] border-[#123d32] px-[18px] py-2.5 text-sm font-semibold text-[#123d32] hover:bg-[#e5f4ed] focus-visible:ring-2 focus-visible:ring-[#15966b] focus-visible:outline-none"
-                >
-                    Ask MtaaFlow
-                </button>
-            </section>
-        </div>
-
-        <!-- Invoices + Transactions -->
-        <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-            <section class="flex flex-col gap-2.5 rounded-[18px] border border-[#e6e4dc] bg-white p-5">
-                <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">
-                    Recent invoices
-                </h2>
-                <div class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-xs text-[#6b7773]">
-                    <span>No.</span>
-                    <span class="flex-1">Customer</span>
-                    <span>Amount</span>
-                    <span>Status</span>
-                </div>
-                <p v-if="invoices.length === 0" class="py-4 text-center text-sm text-[#6b7773]">
-                    No invoices yet.
-                </p>
-                <div
-                    v-for="inv in invoices"
-                    :key="inv.id"
-                    class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-sm text-[#202a27]"
-                >
-                    <span>{{ inv.number }}</span>
-                    <span class="flex-1">{{ inv.customer_name }}</span>
-                    <span>{{ formatMoney(inv.total_amount) }}</span>
-                    <StatusBadge :status="inv.status" />
-                </div>
-            </section>
-
-            <section class="flex flex-col gap-2.5 rounded-[18px] border border-[#e6e4dc] bg-white p-5">
-                <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">
-                    Recent transactions
-                </h2>
-                <div class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-xs text-[#6b7773]">
-                    <span class="flex-1">Customer</span>
-                    <span>Amount</span>
-                </div>
-                <p v-if="transactions.length === 0" class="py-4 text-center text-sm text-[#6b7773]">
-                    No payments yet.
-                </p>
-                <div
-                    v-for="t in transactions"
-                    :key="t.id"
-                    class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-sm"
-                >
-                    <span class="flex-1 text-[#202a27]">{{ t.label }}</span>
-                    <span class="font-semibold" :class="t.failed ? 'text-[#b4432f]' : 'text-[#0d6b4a]'">
-                        {{ t.failed ? '' : '+' }}{{ formatMoney(t.amount) }}
-                    </span>
-                </div>
-            </section>
-        </div>
-
-        <!-- Top sellers + Low stock -->
-        <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-            <section class="flex flex-col gap-2.5 rounded-[18px] border border-[#e6e4dc] bg-white p-5">
-                <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">
-                    Top sellers
-                </h2>
-                <p v-if="topSellers.length === 0" class="py-4 text-center text-sm text-[#6b7773]">
-                    No sales data yet.
-                </p>
-                <div v-for="p in topSellers" :key="p.name" class="flex flex-col gap-[5px]">
-                    <p class="text-sm text-[#202a27]">{{ p.name }} · {{ p.sold }} sold</p>
-                    <div class="h-1.5 w-full overflow-hidden rounded-[9px] bg-[#e6e4dc]">
-                        <div class="h-1.5 rounded-[9px] bg-[#15966b]" :style="{ width: `${(p.sold / maxSold) * 100}%` }" />
-                    </div>
-                </div>
-            </section>
-
-            <section class="flex flex-col gap-2.5 rounded-[18px] border border-[#e6e4dc] bg-white p-5">
-                <h2 class="font-display text-xl leading-[1.15] font-bold tracking-[-0.01em] text-[#202a27]">
-                    Low stock
-                </h2>
-                <div class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-xs text-[#6b7773]">
-                    <span class="flex-1">Product</span>
-                    <span>Stock</span>
-                </div>
-                <p v-if="lowStock.length === 0" class="py-4 text-center text-sm text-[#6b7773]">
-                    Nothing is running low.
-                </p>
-                <div
-                    v-for="item in lowStock"
-                    :key="item.id"
-                    class="flex items-center gap-3 border-b border-[#e6e4dc] py-[11px] text-sm text-[#202a27]"
-                >
-                    <span class="flex-1">{{ item.product }}</span>
-                    <span
-                        class="inline-flex rounded-full px-2.5 py-[3px] text-xs font-semibold whitespace-nowrap"
-                        :class="item.left <= 5 ? 'bg-[#f9e4df] text-[#b4432f]' : 'bg-[#fbf0da] text-[#b7791f]'"
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <section
+                v-reveal
+                class="mf-glass dashboard-metric dashboard-metric-earnings relative overflow-hidden p-5 sm:p-6"
+            >
+                <div class="flex items-center justify-between gap-3">
+                    <h2
+                        class="text-sm font-medium text-brand-forest dark:text-foreground"
                     >
-                        {{ item.left }} left
-                    </span>
+                        {{ t('interface.verified_earnings') }}
+                    </h2>
+                    <span
+                        class="flex size-9 items-center justify-center rounded-xl bg-brand-emerald/10 text-brand-emerald-dark dark:text-[#8bdbb4]"
+                        ><Wallet class="size-[18px]" aria-hidden="true"
+                    /></span>
                 </div>
+                <div class="mt-5 flex flex-col gap-2">
+                    <p
+                        v-for="row in props.verifiedEarningsByCurrency"
+                        :key="row.currency"
+                        class="font-display text-[clamp(1.4rem,2.1vw,2rem)] leading-tight font-bold tracking-tight break-words text-brand-forest dark:text-foreground"
+                    >
+                        {{ money(row.total, row.currency) }}
+                    </p>
+                    <p
+                        v-if="!props.verifiedEarningsByCurrency.length"
+                        class="font-display text-3xl font-bold text-brand-forest dark:text-foreground"
+                    >
+                        0
+                    </p>
+                </div>
+                <p
+                    class="mt-4 flex items-center gap-1.5 text-xs leading-relaxed text-brand-forest/75 dark:text-muted-foreground"
+                >
+                    <Check class="size-3.5 shrink-0" aria-hidden="true" />{{
+                        t('interface.from_completed_payments')
+                    }}
+                </p>
+            </section>
+            <section v-reveal class="mf-glass dashboard-metric p-5 sm:p-6">
+                <div class="flex items-center justify-between gap-3">
+                    <h2
+                        class="text-sm font-medium text-ink-muted dark:text-muted-foreground"
+                    >
+                        {{ t('interface.outstanding_balances') }}
+                    </h2>
+                    <span
+                        class="flex size-9 items-center justify-center rounded-xl bg-[#fbf0da] text-[#8a5b13] dark:bg-[#43371f] dark:text-[#edce91]"
+                        ><Clock3 class="size-[18px]" aria-hidden="true"
+                    /></span>
+                </div>
+                <div class="mt-5 flex flex-col gap-2">
+                    <p
+                        v-for="row in props.outstandingInvoiceTotalsByCurrency"
+                        :key="row.currency"
+                        class="font-display text-[clamp(1.4rem,2.1vw,2rem)] leading-tight font-bold tracking-tight break-words text-brand-forest dark:text-foreground"
+                    >
+                        {{ money(row.total, row.currency) }}
+                    </p>
+                    <p
+                        v-if="!props.outstandingInvoiceTotalsByCurrency.length"
+                        class="font-display text-3xl font-bold text-brand-forest dark:text-foreground"
+                    >
+                        0
+                    </p>
+                </div>
+                <p
+                    class="mt-4 text-xs leading-relaxed text-ink-muted dark:text-muted-foreground"
+                >
+                    <AnimatedNumber :value="outstandingInvoiceCount" />{{
+                        t('interface.outstanding_invoices')
+                    }}
+                </p>
+            </section>
+            <section v-reveal class="mf-glass dashboard-metric p-5 sm:p-6">
+                <div class="flex items-center justify-between gap-3">
+                    <h2
+                        class="text-sm font-medium text-ink-muted dark:text-muted-foreground"
+                    >
+                        {{ t('interface.total_invoiced') }}
+                    </h2>
+                    <span
+                        class="flex size-9 items-center justify-center rounded-xl bg-brand-mint text-brand-forest dark:bg-secondary dark:text-foreground"
+                        ><FileText class="size-[18px]" aria-hidden="true"
+                    /></span>
+                </div>
+                <div class="mt-5 flex flex-col gap-2">
+                    <p
+                        v-for="row in props.invoicedTotalsByCurrency"
+                        :key="row.currency"
+                        class="font-display text-[clamp(1.4rem,2.1vw,2rem)] leading-tight font-bold tracking-tight break-words text-brand-forest dark:text-foreground"
+                    >
+                        {{ money(row.total, row.currency) }}
+                    </p>
+                    <p
+                        v-if="!props.invoicedTotalsByCurrency.length"
+                        class="font-display text-3xl font-bold text-brand-forest dark:text-foreground"
+                    >
+                        0
+                    </p>
+                </div>
+                <p
+                    class="mt-4 text-xs leading-relaxed text-ink-muted dark:text-muted-foreground"
+                >
+                    {{ t('interface.including_drafts')
+                    }}<AnimatedNumber :value="totalInvoices" />{{
+                        t('interface.invoices')
+                    }}
+                </p>
+            </section>
+            <section v-reveal class="mf-glass dashboard-metric p-5 sm:p-6">
+                <div class="flex items-center justify-between gap-3">
+                    <h2
+                        class="text-sm font-medium text-ink-muted dark:text-muted-foreground"
+                    >
+                        {{ t('interface.customer_connections') }}
+                    </h2>
+                    <span
+                        class="flex size-9 items-center justify-center rounded-xl bg-brand-mint text-brand-forest dark:bg-secondary dark:text-foreground"
+                        ><Users class="size-[18px]" aria-hidden="true"
+                    /></span>
+                </div>
+                <p
+                    class="mt-5 font-display text-3xl font-bold tracking-tight text-brand-forest dark:text-foreground"
+                >
+                    <AnimatedNumber :value="totalCustomers" />
+                </p>
+                <Link
+                    :href="customersIndex()"
+                    class="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-emerald-dark hover:underline dark:text-[#8bdbb4]"
+                    >{{ t('interface.manage_customers')
+                    }}<ArrowUpRight class="size-3.5" aria-hidden="true"
+                /></Link>
             </section>
         </div>
+
+        <p
+            class="-mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink-muted dark:text-muted-foreground"
+        >
+            <span
+                class="mt-1 size-1.5 shrink-0 rounded-full bg-brand-emerald"
+                aria-hidden="true"
+            ></span
+            >{{
+                t(
+                    'interface.all_amounts_are_from_your_recorded_activity_shown_in_their_original_currencies',
+                )
+            }}
+        </p>
+
+        <section
+            v-if="!totalInvoices && !recentPayments.length"
+            v-reveal
+            class="mf-card flex flex-col items-center gap-5 border-dashed px-6 py-10 text-center sm:flex-row sm:items-start sm:px-8 sm:text-left"
+        >
+            <div
+                class="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-brand-mint text-brand-emerald-dark dark:bg-secondary dark:text-[#8bdbb4]"
+            >
+                <FileText
+                    class="size-7"
+                    :stroke-width="1.5"
+                    aria-hidden="true"
+                />
+            </div>
+            <div class="max-w-xl">
+                <p class="mf-kicker mb-2">
+                    {{ t('interface.room_for_your_next_chapter') }}
+                </p>
+                <h2
+                    class="font-display text-2xl font-bold tracking-tight text-brand-forest dark:text-foreground"
+                >
+                    {{ t('interface.good_work_deserves_a_great_invoice') }}
+                </h2>
+                <p
+                    class="mt-2 text-sm leading-relaxed text-ink-muted dark:text-muted-foreground"
+                >
+                    {{
+                        t(
+                            'interface.no_invoice_or_payment_activity_yet_add_a_customer_create_your_first_invoice_and_bring_your_business_into_view',
+                        )
+                    }}
+                </p>
+                <div
+                    class="mt-5 flex flex-wrap justify-center gap-3 sm:justify-start"
+                >
+                    <Link
+                        :href="create({ query: { mode: 'manual' } })"
+                        class="mf-button"
+                        >{{ t('interface.create_your_first_invoice')
+                        }}<ArrowRight class="size-4" aria-hidden="true"
+                    /></Link>
+                    <Link
+                        :href="customersIndex()"
+                        class="mf-button-secondary"
+                        >{{ t('interface.manage_customers') }}</Link
+                    >
+                </div>
+            </div>
+        </section>
+
+        <div class="grid items-start gap-5 xl:grid-cols-[1.3fr_1fr]">
+            <section v-reveal class="mf-card min-w-0 overflow-hidden">
+                <header
+                    class="flex items-start justify-between gap-4 border-b border-line/80 p-5 sm:px-6 sm:py-5 dark:border-border/80"
+                >
+                    <div>
+                        <p class="mf-kicker mb-1.5">
+                            {{ t('interface.the_latest') }}
+                        </p>
+                        <h2
+                            class="font-display text-xl font-bold tracking-tight text-brand-forest dark:text-foreground"
+                        >
+                            {{ t('interface.recent_invoices') }}
+                        </h2>
+                    </div>
+                    <Link
+                        :href="invoicesIndex()"
+                        class="mt-1 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-emerald-dark hover:underline dark:text-[#8bdbb4]"
+                        >{{ t('interface.view_all')
+                        }}<ArrowUpRight class="size-4" aria-hidden="true"
+                    /></Link>
+                </header>
+                <div
+                    v-if="!recentInvoices.length"
+                    class="flex min-h-48 flex-col items-center justify-center gap-2 p-8 text-center"
+                >
+                    <FileText
+                        class="mb-1 size-7 text-brand-emerald/65"
+                        :stroke-width="1.5"
+                        aria-hidden="true"
+                    />
+                    <p
+                        class="font-semibold text-brand-forest dark:text-foreground"
+                    >
+                        {{ t('interface.your_next_invoice_starts_here') }}
+                    </p>
+                    <p
+                        class="max-w-xs text-sm text-ink-muted dark:text-muted-foreground"
+                    >
+                        {{
+                            t(
+                                'interface.new_invoices_will_appear_here_so_you_can_follow_their_progress',
+                            )
+                        }}
+                    </p>
+                </div>
+                <div v-else class="divide-y divide-line/70 px-5 sm:px-6">
+                    <Link
+                        v-for="invoice in recentInvoices"
+                        :key="invoice.id"
+                        :href="show(invoice.id)"
+                        class="group flex items-center gap-3 py-4 transition-colors hover:bg-brand-mint/25 dark:hover:bg-secondary/25"
+                    >
+                        <span
+                            class="hidden size-10 shrink-0 items-center justify-center rounded-xl border border-line bg-canvas text-brand-forest sm:flex dark:border-border dark:bg-background dark:text-foreground"
+                            ><FileText
+                                class="size-[18px]"
+                                :stroke-width="1.5"
+                                aria-hidden="true"
+                        /></span>
+                        <div class="min-w-0 flex-1">
+                            <p
+                                class="truncate text-sm font-semibold text-brand-forest group-hover:text-brand-emerald-dark dark:text-foreground dark:hover:text-[#a8e8c9]"
+                            >
+                                {{
+                                    invoice.customer?.name ||
+                                    t('invoices.customer')
+                                }}
+                            </p>
+                            <p
+                                class="mt-1 truncate text-xs text-ink-muted dark:text-muted-foreground"
+                            >
+                                {{ invoice.invoice_number }}
+                            </p>
+                        </div>
+                        <div class="min-w-0 text-right">
+                            <p
+                                class="text-sm font-semibold break-words text-brand-forest dark:text-foreground"
+                            >
+                                {{ money(invoice.total, invoice.currency) }}
+                            </p>
+                            <span
+                                class="mt-1 inline-flex items-center gap-1.5 text-xs capitalize"
+                                :class="
+                                    invoice.status === 'paid'
+                                        ? 'text-brand-emerald-dark dark:text-[#8bdbb4]'
+                                        : invoice.status === 'draft'
+                                          ? 'text-ink-muted dark:text-muted-foreground'
+                                          : 'text-[#8a5b13] dark:text-[#edce91]'
+                                "
+                                ><span
+                                    class="size-1.5 rounded-full bg-current"
+                                    aria-hidden="true"
+                                ></span
+                                >{{ statusLabel(invoice.status) }}</span
+                            >
+                        </div>
+                        <ArrowUpRight
+                            class="ml-1 hidden size-4 shrink-0 text-ink-muted/50 transition-colors group-hover:text-brand-emerald-dark sm:block dark:hover:text-[#a8e8c9]"
+                            aria-hidden="true"
+                        />
+                    </Link>
+                </div>
+                <footer
+                    class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line/80 bg-canvas/70 px-5 py-3.5 text-xs text-ink-muted sm:px-6 dark:border-border/80 dark:bg-background/40 dark:text-muted-foreground"
+                >
+                    <span
+                        ><strong
+                            class="font-semibold text-brand-forest dark:text-foreground"
+                            ><AnimatedNumber :value="totalInvoices" /></strong
+                        >{{ t('interface.total_invoices') }}</span
+                    ><span class="inline-flex items-center gap-1.5"
+                        ><span
+                            class="size-1.5 rounded-full bg-brand-emerald"
+                            aria-hidden="true"
+                        ></span
+                        ><strong
+                            class="font-semibold text-brand-forest dark:text-foreground"
+                            ><AnimatedNumber
+                                :value="paidInvoiceCount" /></strong
+                        >{{ t('interface.paid') }}</span
+                    ><span class="inline-flex items-center gap-1.5"
+                        ><span
+                            class="size-1.5 rounded-full bg-[#b7791f]"
+                            aria-hidden="true"
+                        ></span
+                        >{{ outstandingInvoiceCount
+                        }}{{ t('interface.outstanding') }}</span
+                    >
+                </footer>
+            </section>
+
+            <section v-reveal class="mf-card min-w-0 overflow-hidden">
+                <header
+                    class="flex items-start justify-between gap-4 border-b border-line/80 p-5 sm:px-6 sm:py-5 dark:border-border/80"
+                >
+                    <div>
+                        <p class="mf-kicker mb-1.5">
+                            {{ t('interface.money_in') }}
+                        </p>
+                        <h2
+                            class="font-display text-xl font-bold tracking-tight text-brand-forest dark:text-foreground"
+                        >
+                            {{ t('interface.completed_payments') }}
+                        </h2>
+                    </div>
+                    <span
+                        class="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-mint text-brand-emerald-dark dark:bg-secondary dark:text-[#8bdbb4]"
+                        ><ArrowDownLeft class="size-4" aria-hidden="true"
+                    /></span>
+                </header>
+                <div
+                    v-if="!recentPayments.length"
+                    class="flex min-h-48 flex-col items-center justify-center gap-2 p-8 text-center"
+                >
+                    <Wallet
+                        class="mb-1 size-7 text-brand-emerald/65"
+                        :stroke-width="1.5"
+                        aria-hidden="true"
+                    />
+                    <p
+                        class="font-semibold text-brand-forest dark:text-foreground"
+                    >
+                        {{ t('interface.a_place_for_every_payment') }}
+                    </p>
+                    <p
+                        class="max-w-xs text-sm text-ink-muted dark:text-muted-foreground"
+                    >
+                        {{
+                            t(
+                                'interface.your_completed_payments_will_appear_here_as_they_arrive',
+                            )
+                        }}
+                    </p>
+                </div>
+                <div v-else class="divide-y divide-line/70 px-5 sm:px-6">
+                    <div
+                        v-for="payment in recentPayments"
+                        :key="payment.id"
+                        class="flex items-center gap-3 py-4"
+                    >
+                        <span
+                            class="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-mint text-brand-emerald-dark dark:bg-secondary dark:text-[#8bdbb4]"
+                            ><ArrowDownLeft class="size-4" aria-hidden="true"
+                        /></span>
+                        <div class="min-w-0 flex-1">
+                            <p
+                                class="truncate text-sm font-semibold text-brand-forest dark:text-foreground"
+                            >
+                                {{
+                                    payment.invoice?.customer?.name ||
+                                    t('interface.customer_payment')
+                                }}
+                            </p>
+                            <p
+                                class="mt-1 text-xs text-ink-muted dark:text-muted-foreground"
+                            >
+                                {{ date(payment.paid_at) }}
+                            </p>
+                        </div>
+                        <p
+                            class="text-right text-sm font-semibold break-words text-brand-emerald-dark dark:text-[#8bdbb4]"
+                        >
+                            {{ money(payment.amount, payment.currency) }}
+                        </p>
+                    </div>
+                </div>
+                <footer
+                    class="border-t border-line/80 bg-canvas/70 px-5 py-3.5 sm:px-6 dark:border-border/80 dark:bg-background/40"
+                >
+                    <Link
+                        :href="reportsIndex()"
+                        class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-emerald-dark hover:underline dark:text-[#8bdbb4]"
+                        >{{ t('interface.explore_your_reports')
+                        }}<ArrowRight class="size-3.5" aria-hidden="true"
+                    /></Link>
+                </footer>
+            </section>
+        </div>
+
+        <Link
+            v-reveal
+            :href="askIndex()"
+            class="dashboard-assistant group relative flex flex-col items-start justify-between gap-5 overflow-hidden rounded-[22px] bg-brand-forest p-6 text-white sm:flex-row sm:items-center sm:p-7"
+        >
+            <div class="relative z-10 flex items-start gap-4">
+                <span
+                    class="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10"
+                    ><Sparkles
+                        class="size-5 text-[#a8e8c9]"
+                        :stroke-width="1.5"
+                        aria-hidden="true"
+                /></span>
+                <div>
+                    <p
+                        class="mb-1 text-xs font-medium tracking-wide text-[#a8e8c9]"
+                    >
+                        ASK MTAAFLOW
+                    </p>
+                    <h2 class="font-display text-xl font-bold tracking-tight">
+                        {{ t('interface.your_numbers_a_clearer_next_step') }}
+                    </h2>
+                    <p
+                        class="mt-1.5 max-w-xl text-sm leading-relaxed text-[#cfe3da]"
+                    >
+                        {{
+                            t(
+                                'interface.ask_about_your_recorded_business_activity_or_draft_an_invoice_with_a_little_ai_assistance',
+                            )
+                        }}
+                    </p>
+                </div>
+            </div>
+            <span
+                class="relative z-10 inline-flex shrink-0 items-center gap-2 text-sm font-semibold"
+                >{{ t('interface.open_assistant')
+                }}<ArrowUpRight
+                    class="size-4 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5 motion-safe:group-hover:-translate-y-0.5"
+                    aria-hidden="true"
+            /></span>
+        </Link>
     </div>
 </template>
+
+<style scoped>
+.dashboard-metric {
+    min-height: 184px;
+}
+.dashboard-metric-earnings {
+    background: linear-gradient(125deg, var(--secondary), var(--mf-glass));
+}
+.dashboard-assistant::after {
+    position: absolute;
+    right: 3%;
+    bottom: -180px;
+    width: 370px;
+    height: 370px;
+    border: 1px solid rgb(207 238 224 / 10%);
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 42px rgb(207 238 224 / 4%),
+        0 0 0 85px rgb(207 238 224 / 3%);
+    content: '';
+    pointer-events: none;
+}
+</style>

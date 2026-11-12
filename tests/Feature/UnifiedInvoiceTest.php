@@ -5,6 +5,11 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 
+beforeEach(function () {
+    config(['services.ai.primary_provider' => 'gemini', 'services.ai.fallback_provider' => null, 'inertia.ssr.enabled' => false]);
+    Http::preventStrayRequests();
+});
+
 test('confirmed invoices preserve currency precision and duplicate requests create one draft', function (string $currency, string $price, string $total) {
     $user = User::factory()->create();
     $customer = $user->customers()->create(['name' => 'Mary']);

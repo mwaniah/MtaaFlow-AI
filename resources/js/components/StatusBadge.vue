@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { translate as t } from '@/lib/i18n';
 import { computed } from 'vue';
 
 type BadgeStatus =
@@ -13,13 +14,48 @@ type BadgeStatus =
 const props = defineProps<{ status: BadgeStatus }>();
 
 const styles: Record<BadgeStatus, { label: string; classes: string }> = {
-    paid: { label: 'Paid', classes: 'bg-brand-mint text-paid' },
-    up_to_date: { label: 'Up to date', classes: 'bg-brand-mint text-paid' },
-    pending: { label: 'Pending', classes: 'bg-pending-bg text-pending' },
-    partial: { label: 'Partially paid', classes: 'bg-partial-bg text-partial' },
-    overdue: { label: 'Overdue', classes: 'bg-overdue-bg text-overdue' },
-    draft: { label: 'Draft', classes: 'bg-draft-bg text-draft' },
-    cancelled: { label: 'Cancelled', classes: 'bg-draft-bg text-cancelled' },
+    paid: {
+        get label() {
+            return t('status.paid');
+        },
+        classes: 'bg-brand-mint text-paid',
+    },
+    up_to_date: {
+        get label() {
+            return t('interface.up_to_date');
+        },
+        classes: 'bg-brand-mint text-paid',
+    },
+    pending: {
+        get label() {
+            return t('status.pending');
+        },
+        classes: 'bg-pending-bg text-pending',
+    },
+    partial: {
+        get label() {
+            return t('interface.partially_paid');
+        },
+        classes: 'bg-partial-bg text-partial',
+    },
+    overdue: {
+        get label() {
+            return t('interface.overdue');
+        },
+        classes: 'bg-overdue-bg text-overdue',
+    },
+    draft: {
+        get label() {
+            return t('status.draft');
+        },
+        classes: 'bg-draft-bg text-draft',
+    },
+    cancelled: {
+        get label() {
+            return t('status.cancelled');
+        },
+        classes: 'bg-draft-bg text-cancelled',
+    },
 };
 
 const current = computed(() => styles[props.status]);

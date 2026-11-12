@@ -3,12 +3,12 @@
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InventoryAdjustmentController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceShareController;
-use App\Http\Controllers\InventoryAdjustmentController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\PaymentReminderDeliveryController;
 use App\Http\Controllers\PaymentReminderController;
+use App\Http\Controllers\PaymentReminderDeliveryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportsController;
 use Illuminate\Support\Facades\Route;
@@ -20,7 +20,18 @@ Route::get('shared/invoices/{token}', [InvoiceShareController::class, 'show'])
     ->where('token', '[A-Za-z0-9]{64}')
     ->name('invoice-shares.public');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::post('shared/invoices/{token}/paypal/orders', [PaymentController::class, 'createSharedPaypalOrder'])
+    ->middleware('throttle:10,1')
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->name('invoice-shares.paypal.orders');
+
+Route::post('shared/invoices/{token}/paypal/orders/{orderId}/capture', [PaymentController::class, 'captureSharedPaypalOrder'])
+    ->middleware('throttle:10,1')
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->where('orderId', '[A-Za-z0-9-]+')
+    ->name('invoice-shares.paypal.capture');
+
+Route::middleware(['auth'])->group(function () {
 
     Route::get('dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
@@ -103,6 +114,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('throttle:20,1')
         ->name('ai.invoice.confirm');
 
+    Route::post('ai/actions/cancel', [AIController::class, 'cancelAction'])
+        ->middleware('throttle:20,1')->name('ai.actions.cancel');
+
     Route::post('ai/actions/confirm', [AIController::class, 'confirmAction'])
         ->middleware('throttle:20,1')
         ->name('ai.actions.confirm');
@@ -143,9 +157,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 require __DIR__.'/settings.php';
 
-// LOCAL ONLY: delete before merging.
-Route::middleware(['auth', 'verified'])->group(function () {
+// Additional authenticated application pages.
+Route::middleware(['auth'])->group(function () {
     Route::inertia('inventory', 'Inventory/Index')->name('inventory.index');
     Route::inertia('ask', 'AskMtaaFlow/Index')->name('ask.index');
-    Route::inertia('insights', 'Insights/Index')->name('insights.index');
+    Route::get('insights', fn () => redirect()->route('reports.index'))->name('insights.index');
 });
