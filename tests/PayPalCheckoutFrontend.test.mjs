@@ -244,7 +244,7 @@ function mount(context, responses) {
     };
 }
 
-test('guest checkout requests Laravel JSON then navigates to the unchanged PayPal approval URL', async (context) => {
+void test('guest checkout requests Laravel JSON then navigates to the unchanged PayPal approval URL', async (context) => {
     const approvalUrl =
         'https://www.sandbox.paypal.com/checkoutnow?token=ORDER-1&useraction=commit&locale.x=fr_FR';
     const view = mount(context, [
@@ -270,7 +270,7 @@ test('guest checkout requests Laravel JSON then navigates to the unchanged PayPa
     assert.deepEqual(view.navigations, [approvalUrl]);
 });
 
-test('an already verified checkout refreshes the invoice without returning to PayPal', async (context) => {
+void test('an already verified checkout refreshes the invoice without returning to PayPal', async (context) => {
     const view = mount(context, [
         {
             order_id: 'ORDER-1',
@@ -308,7 +308,7 @@ test('an already verified checkout refreshes the invoice without returning to Pa
     );
 });
 
-test('a buyer-approved checkout requests verified capture before showing payment success', async (context) => {
+void test('a buyer-approved checkout requests verified capture before showing payment success', async (context) => {
     const view = mount(context, [
         {
             order_id: 'ORDER-1',
@@ -350,7 +350,7 @@ test('a buyer-approved checkout requests verified capture before showing payment
     );
 });
 
-test('buyer approval alone does not display verified payment success', async (context) => {
+void test('buyer approval alone does not display verified payment success', async (context) => {
     const view = mount(context, [
         {
             order_id: 'ORDER-1',

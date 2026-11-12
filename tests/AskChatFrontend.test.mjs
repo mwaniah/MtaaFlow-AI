@@ -72,7 +72,7 @@ const markdown = (text) =>
         }),
     );
 
-test('creates a valid chat UUID when randomUUID is unavailable on a local HTTP origin', () => {
+void test('creates a valid chat UUID when randomUUID is unavailable on a local HTTP origin', () => {
     const id = createConversationId({
         getRandomValues: (bytes) => bytes.fill(1),
     });
@@ -80,7 +80,7 @@ test('creates a valid chat UUID when randomUUID is unavailable on a local HTTP o
     assert.equal(id, '01010101-0101-4101-8101-010101010101');
 });
 
-test('accepts a previously unseen question and preserves its natural-language answer', async () => {
+void test('accepts a previously unseen question and preserves its natural-language answer', async () => {
     const calls = [];
     const chat = useAskConversation(
         async (...args) => {
@@ -108,7 +108,7 @@ test('accepts a previously unseen question and preserves its natural-language an
     assert.equal(chat.messages.value[1].error, undefined);
 });
 
-test('keeps one pending request, rejects duplicate submissions and removes pending on success', async () => {
+void test('keeps one pending request, rejects duplicate submissions and removes pending on success', async () => {
     let finish;
     let count = 0;
     const chat = useAskConversation(
@@ -134,7 +134,7 @@ test('keeps one pending request, rejects duplicate submissions and removes pendi
     assert.equal(chat.messages.value.length, 2);
 });
 
-test('removes pending after a request failure and permits another question', async () => {
+void test('removes pending after a request failure and permits another question', async () => {
     let count = 0;
     const chat = useAskConversation(
         async () => {
@@ -159,7 +159,7 @@ test('removes pending after a request failure and permits another question', asy
     assert.equal(chat.messages.value[3].error, undefined);
 });
 
-test('keeps the active chat UUID for follow-ups and replaces it when clearing', async () => {
+void test('keeps the active chat UUID for follow-ups and replaces it when clearing', async () => {
     const ids = [chatId, freshId];
     const requests = [];
     const chat = useAskConversation(
@@ -182,7 +182,7 @@ test('keeps the active chat UUID for follow-ups and replaces it when clearing', 
     assert.deepEqual(chat.messages.value, []);
 });
 
-test('ignores empty input and bounds the active in-memory display', async () => {
+void test('ignores empty input and bounds the active in-memory display', async () => {
     let count = 0;
     const chat = useAskConversation(
         async () => {
@@ -202,7 +202,7 @@ test('ignores empty input and bounds the active in-memory display', async () => 
     assert.equal(chat.messages.value[0].text, 'Question 3');
 });
 
-test('renders the account answer without accepting raw records or customer metadata', () => {
+void test('renders the account answer without accepting raw records or customer metadata', () => {
     const reply = parseAskReply({
         intent: 'account_read',
         answer: 'You currently have 1 customer in your MtaaFlow account.',
@@ -220,7 +220,7 @@ test('renders the account answer without accepting raw records or customer metad
     assert.equal(Object.hasOwn(reply, 'data'), false);
 });
 
-test('rejects malformed and raw JSON answers instead of showing structured data', () => {
+void test('rejects malformed and raw JSON answers instead of showing structured data', () => {
     for (const payload of [
         null,
         { data: { customers: [] } },
@@ -232,7 +232,7 @@ test('rejects malformed and raw JSON answers instead of showing structured data'
     }
 });
 
-test('keeps invoice drafting as an explicit form review rather than an automatic action', () => {
+void test('keeps invoice drafting as an explicit form review rather than an automatic action', () => {
     const reply = parseAskReply({ intent: 'invoice', conversation_id: chatId });
 
     assert.equal(reply.intent, 'invoice');
@@ -241,7 +241,7 @@ test('keeps invoice drafting as an explicit form review rather than an automatic
     assert.match(reply.answer, /No invoice has been created/);
 });
 
-test('renders paragraphs, lists, emphasis, headings and escaped code readably', async () => {
+void test('renders paragraphs, lists, emphasis, headings and escaped code readably', async () => {
     const html = await markdown(
         '### Improve cash flow\n\nUse **clear terms** and *friendly reminders*.\n\n1. Agree a deposit\n2. Send an invoice\n\n- Track due dates\n- Follow up\n\nUse `revenue - expenses`.\n\n```text\n<invoice total="250">\n```',
     );
@@ -258,7 +258,7 @@ test('renders paragraphs, lists, emphasis, headings and escaped code readably', 
     assert.match(html, /&lt;invoice total=/);
 });
 
-test('escapes HTML and refuses executable, relative and credential-bearing Markdown links', async () => {
+void test('escapes HTML and refuses executable, relative and credential-bearing Markdown links', async () => {
     const html = await markdown(
         '<script>alert("xss")</script>\n\n<img src=x onerror=alert(1)>\n\n[bad](javascript:alert) [data](data:text/html,payload) [relative](/admin) [credentials](https://user:secret@example.test/) [encoded](jav&#x61;script:alert)',
     );
@@ -269,7 +269,7 @@ test('escapes HTML and refuses executable, relative and credential-bearing Markd
     assert.match(html, /&lt;script&gt;/);
 });
 
-test('allows only explicit HTTP(S) links with safe external navigation attributes', async () => {
+void test('allows only explicit HTTP(S) links with safe external navigation attributes', async () => {
     const html = await markdown(
         '[PayPal help](https://www.paypal.com/us/cshelp/) and [Reference](http://example.test/path?q=one&x=two)',
     );
@@ -280,7 +280,7 @@ test('allows only explicit HTTP(S) links with safe external navigation attribute
     assert.match(html, /q=one&amp;x=two/);
 });
 
-test('renders escaped customer names literally without turning them into links or emphasis', async () => {
+void test('renders escaped customer names literally without turning them into links or emphasis', async () => {
     const html = await markdown(
         String.raw`Your customers:\n\n- \[Client\](https://example.test)\n- \*\*Premium\*\* Studio\n- \_Partner\_ & Associates`.replaceAll(
             '\\n',
@@ -297,7 +297,7 @@ test('renders escaped customer names literally without turning them into links o
     assert.match(html, /_Partner_ &amp; Associates/);
 });
 
-test('preserves deliberate formatting around escaped names and literal backslashes in code', async () => {
+void test('preserves deliberate formatting around escaped names and literal backslashes in code', async () => {
     const html = await markdown(
         String.raw`**Customer: \[Client\](https://example.test)** and \*literal\* punctuation.` +
             ' Use `C:\\Invoices\\` and `\\*`.',
@@ -313,7 +313,7 @@ test('preserves deliberate formatting around escaped names and literal backslash
     assert.equal(html.includes('<code>\\*</code>'), true);
 });
 
-test('escapes a literal name containing HTML even when its Markdown punctuation is escaped', async () => {
+void test('escapes a literal name containing HTML even when its Markdown punctuation is escaped', async () => {
     const AssistantMessage = await component('AssistantMessage');
     const html = await renderToString(
         createSSRApp(AssistantMessage, {
@@ -330,7 +330,7 @@ test('escapes a literal name containing HTML even when its Markdown punctuation 
     );
 });
 
-test('compiles the production assistant message component and escapes model-controlled content', async () => {
+void test('compiles the production assistant message component and escapes model-controlled content', async () => {
     const AssistantMessage = await component('AssistantMessage');
     const html = await renderToString(
         createSSRApp(AssistantMessage, {
@@ -343,7 +343,7 @@ test('compiles the production assistant message component and escapes model-cont
     assert.match(html, /&lt;svg/);
 });
 
-test('renders the reusable thinking indicator with three decorative dots and an accessible status', async () => {
+void test('renders the reusable thinking indicator with three decorative dots and an accessible status', async () => {
     const AssistantThinking = await component('AssistantThinking');
     const html = await renderToString(createSSRApp(AssistantThinking));
 
@@ -357,7 +357,7 @@ test('renders the reusable thinking indicator with three decorative dots and an 
     assert.equal(html.includes('Checking your request'), false);
 });
 
-test('uses immediate scrolling for reduced motion and smooth scrolling otherwise', () => {
+void test('uses immediate scrolling for reduced motion and smooth scrolling otherwise', () => {
     assert.equal(conversationScrollBehavior(true), 'instant');
     assert.equal(conversationScrollBehavior(false), 'smooth');
 });

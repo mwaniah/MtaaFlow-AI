@@ -24,7 +24,7 @@ const placeholders = (message) =>
         .map((match) => match[1])
         .sort((left, right) => left.localeCompare(right));
 
-test('every application message has translations with the same named parameters', () => {
+void test('every application message has translations with the same named parameters', () => {
     const keys = Object.keys(catalogs.en).sort();
     for (const locale of languages) {
         assert.deepEqual(Object.keys(catalogs[locale]).sort(), keys, locale);
@@ -41,7 +41,7 @@ test('every application message has translations with the same named parameters'
     }
 });
 
-test('every catalog message compiles and interpolates without localization errors', () => {
+void test('every catalog message compiles and interpolates without localization errors', () => {
     const errors = [];
     const i18n = createI18n({
         legacy: false,
@@ -71,14 +71,14 @@ test('every catalog message compiles and interpolates without localization error
     assert.deepEqual(errors, []);
 });
 
-test('all public authentication business and shared Vue interface literals use translation keys', () => {
+void test('all public authentication business and shared Vue interface literals use translation keys', () => {
     const remaining = vueFiles().flatMap((path) =>
         extract(path).map((entry) => `${path}: ${entry.value}`),
     );
     assert.deepEqual(remaining, []);
 });
 
-test('browser language detection handles regions priority and unsupported languages', () => {
+void test('browser language detection handles regions priority and unsupported languages', () => {
     assert.equal(detectLocale(null, []), 'en');
     for (const [browser, locale] of [
         ['en-US', 'en'],
@@ -96,7 +96,7 @@ test('browser language detection handles regions priority and unsupported langua
     assert.equal(resolveLocale(null, 'de', ['fr-FR']), 'de');
 });
 
-test('locale formatting retains the supplied currency amount and calendar date', () => {
+void test('locale formatting retains the supplied currency amount and calendar date', () => {
     for (const locale of languages) {
         const amount = '1234.50';
         const currency = 'USD';
@@ -119,7 +119,7 @@ test('locale formatting retains the supplied currency amount and calendar date',
     }
 });
 
-test('switching languages immediately changes interface messages while retaining interpolated business data', () => {
+void test('switching languages immediately changes interface messages while retaining interpolated business data', () => {
     const i18n = createI18n({
         legacy: false,
         flatJson: true,
@@ -151,7 +151,7 @@ test('switching languages immediately changes interface messages while retaining
     }
 });
 
-test('guest preferences survive refresh account login logout and cached navigation without touching appearance', async () => {
+void test('guest preferences survive refresh account login logout and cached navigation without touching appearance', async () => {
     const original = Object.fromEntries(
         ['document', 'localStorage', 'navigator', 'location'].map((key) => [
             key,
